@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
 
@@ -11,6 +11,8 @@ const Login = () => {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = location.state?.redirectTo || null; // optional return path
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,8 +25,24 @@ const Login = () => {
 
     try {
       setLoading(true);
-      await login(email, password);
-      navigate('/dashboard');
+      const res = await login(email, password);
+      // login() should return an object like { token, user }
+      const loggedUser = res?.user || res;
+
+      // If route that triggered login wanted a redirect (e.g. clicked a course), honor it
+      if (redirectTo) {
+        navigate(redirectTo);
+        return;
+      }
+
+      // Role-based routing
+      if (loggedUser?.role === 'admin' || loggedUser?.isAdmin) {
+        navigate('/admin');
+      } else if (loggedUser?.role === 'student') {
+        navigate('/dashboard');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid email or password');
     } finally {

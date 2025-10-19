@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UserPlus, Mail, Lock, User, AlertCircle } from 'lucide-react';
 
@@ -15,6 +15,8 @@ const Register = () => {
 
   const { register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = location.state?.redirectTo || null; // e.g. /course/:id
 
   const handleChange = (e) => {
     setFormData({
@@ -44,8 +46,25 @@ const Register = () => {
 
     try {
       setLoading(true);
-      await register(formData.name, formData.email, formData.password);
-      navigate('/dashboard');
+      const res = await register(formData.name, formData.email, formData.password);
+
+      // register() from AuthContext returns response.data which should contain { token, user }
+      const createdUser = res?.user || null;
+
+      // If redirectTo exists (user clicked a course and was sent to register), go there
+      if (redirectTo) {
+        navigate(redirectTo);
+        return;
+      }
+
+      // Otherwise, role-based routing
+      if (createdUser?.role === 'admin' || createdUser?.isAdmin) {
+        navigate('/admin');
+      } else if (createdUser?.role === 'student') {
+        navigate('/dashboard');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
     } finally {

@@ -16,13 +16,25 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
+    try {
+      const token = localStorage.getItem('token');
+      const savedUser = localStorage.getItem('user');
 
-    if (token && savedUser) {
-      setUser(JSON.parse(savedUser));
+      if (token && savedUser && savedUser !== 'undefined') {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+      } else {
+        // Clean up invalid values
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    } catch (err) {
+      console.error('Failed to load user from localStorage:', err);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = async (email, password) => {
@@ -62,5 +74,9 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!user,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
 };
