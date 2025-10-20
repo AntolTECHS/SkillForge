@@ -26,7 +26,10 @@ const Home = () => {
       setError(null);
       const response = await axios.get("/courses");
       setCourses(response.data.courses || []);
-      setTotal(response.data.total || (response.data.courses ? response.data.courses.length : 0));
+      setTotal(
+        response.data.total ||
+          (response.data.courses ? response.data.courses.length : 0)
+      );
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load courses");
       setCourses([]);
@@ -48,7 +51,8 @@ const Home = () => {
     }
   };
 
-  const displaySlots = 4;
+  // ✅ Display only 3 course cards
+  const displaySlots = 3;
   const displayCourses = courses.slice(0, displaySlots);
   const placeholderCount = Math.max(0, displaySlots - displayCourses.length);
   const placeholders = Array.from({ length: placeholderCount });
@@ -57,26 +61,40 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-950 to-blue-900 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="flex justify-center items-center mb-4">
-            <BookOpen className="w-12 h-12 mr-3 text-blue-200" />
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
-              Welcome to SkillForge
-            </h1>
-          </div>
-          <p className="text-xl text-blue-200 max-w-2xl mx-auto leading-relaxed">
-            Unlock your potential with expert-led courses. Learn new skills and advance your career.
-          </p>
+      {/* Hero Section with Side Image */}
+      <div className="bg-gradient-to-r from-blue-950 to-blue-900 text-white">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-16 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          {/* Left: Text Content */}
+          <div className="text-center lg:text-left space-y-6">
+            <div className="flex justify-center lg:justify-start items-center mb-4">
+              <BookOpen className="w-12 h-12 mr-3 text-blue-200" />
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
+                Welcome to SkillForge
+              </h1>
+            </div>
 
-          <div className="mt-8 flex justify-center">
-            <button
-              onClick={handleGetStarted}
-              className="inline-flex items-center rounded-md bg-white text-blue-950 px-6 py-3 font-semibold shadow hover:bg-blue-50 transition"
-            >
-              Get Started
-            </button>
+            <p className="text-xl text-blue-100 leading-relaxed max-w-xl mx-auto lg:mx-0">
+              Unlock your potential with expert-led courses. Learn new skills
+              and advance your career through hands-on learning experiences.
+            </p>
+
+            <div className="pt-4">
+              <button
+                onClick={handleGetStarted}
+                className="inline-flex items-center rounded-md bg-white text-blue-950 px-6 py-3 font-semibold shadow hover:bg-blue-50 transition"
+              >
+                Get Started
+              </button>
+            </div>
+          </div>
+
+          {/* Right: Hero Image */}
+          <div className="flex justify-center lg:justify-end">
+            <img
+              src="https://images.unsplash.com/photo-1553877522-43269d4ea984?auto=format&fit=crop&w=1200&q=80"
+              alt="Learning Illustration"
+              className="w-full max-w-lg rounded-lg shadow-lg object-cover"
+            />
           </div>
         </div>
       </div>
@@ -84,31 +102,43 @@ const Home = () => {
       {/* Unique Section: Why Choose SkillForge */}
       <div className="bg-white shadow-md rounded-lg py-16 mb-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-extrabold text-gray-900 mb-4">Why Choose SkillForge?</h2>
+          <h2 className="text-4xl font-extrabold text-gray-900 mb-4">
+            Why Choose SkillForge?
+          </h2>
           <p className="text-lg text-gray-700 max-w-2xl mx-auto mb-12">
-            We empower learners with practical skills, expert instructors, and a community-driven experience.
+            We empower learners with practical skills, expert instructors, and a
+            community-driven experience.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
             <div className="bg-gray-50 rounded-lg p-6 hover:shadow-lg transition transform hover:scale-105">
               <div className="text-4xl mb-4">🚀</div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-900">Fast Learning</h3>
+              <h3 className="text-xl font-semibold mb-2 text-gray-900">
+                Fast Learning
+              </h3>
               <p className="text-gray-700">
-                Get up to speed with practical, bite-sized courses designed for immediate impact.
+                Get up to speed with practical, bite-sized courses designed for
+                immediate impact.
               </p>
             </div>
             <div className="bg-gray-50 rounded-lg p-6 hover:shadow-lg transition transform hover:scale-105">
               <div className="text-4xl mb-4">👩‍🏫</div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-900">Expert Instructors</h3>
+              <h3 className="text-xl font-semibold mb-2 text-gray-900">
+                Expert Instructors
+              </h3>
               <p className="text-gray-700">
-                Learn from industry leaders with real-world experience and guidance at every step.
+                Learn from industry leaders with real-world experience and
+                guidance at every step.
               </p>
             </div>
             <div className="bg-gray-50 rounded-lg p-6 hover:shadow-lg transition transform hover:scale-105">
               <div className="text-4xl mb-4">💡</div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-900">Career Growth</h3>
+              <h3 className="text-xl font-semibold mb-2 text-gray-900">
+                Career Growth
+              </h3>
               <p className="text-gray-700">
-                Acquire skills that boost your career, with certificates to showcase your achievements.
+                Acquire skills that boost your career, with certificates to
+                showcase your achievements.
               </p>
             </div>
           </div>
@@ -130,7 +160,7 @@ const Home = () => {
         </div>
 
         {/* Course Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           {displayCourses.map((course) => (
             <div
               key={course._id}
@@ -161,7 +191,9 @@ const Home = () => {
               }}
             >
               <div className="text-3xl text-gray-400 mb-3">🎓</div>
-              <h3 className="text-lg font-semibold text-gray-800">Become a member</h3>
+              <h3 className="text-lg font-semibold text-gray-800">
+                Become a member
+              </h3>
               <p className="text-sm text-gray-500 mt-2">
                 Sign up to access more courses and enroll instantly.
               </p>

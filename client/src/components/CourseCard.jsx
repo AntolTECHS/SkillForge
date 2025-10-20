@@ -35,9 +35,10 @@ const CourseCard = ({ course }) => {
           </div>
         </div>
 
+        {/* Light Blue "View Details" Button */}
         <Link
           to={`/course/${course._id}`}
-          className="block w-full text-center bg-blue-950 text-white py-2 px-4 rounded-md hover:bg-blue-900 transition-colors font-medium"
+          className="block w-full text-center bg-blue-700 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors font-medium"
         >
           View Details
         </Link>

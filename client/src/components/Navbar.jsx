@@ -1,15 +1,23 @@
 // src/components/Navbar.jsx
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { GraduationCap, LogOut, User, LayoutDashboard, ShieldCheck } from 'lucide-react';
+import {
+  GraduationCap,
+  LogOut,
+  User,
+  LayoutDashboard,
+  ShieldCheck,
+  Search,
+  X,
+} from 'lucide-react';
 
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    // TEMP DEBUG: remove this after verifying duplication issue
     console.trace('Navbar rendered');
   }, []);
 
@@ -21,19 +29,51 @@ const Navbar = () => {
   return (
     <nav
       id="site-navbar"
-      data-debug="navbar-v1" // TEMP marker to find duplicates in DOM; remove later
-      className="bg-white shadow-md sticky top-0 z-50"
+      className="bg-white shadow-md sticky top-0 z-50 w-full"
       role="navigation"
       aria-label="Main Navigation"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+      {/* Main Container — pushed to edges */}
+      <div className="flex justify-between items-center h-16 px-6 sm:px-10 lg:px-16">
+
+        {/* Left Section — Hamburger + Logo */}
+        <div className="flex items-center space-x-3">
+          {/* Compact Bold Hamburger Icon with perfect spacing */}
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="block lg:hidden focus:outline-none"
+            aria-label="Toggle menu"
+          >
+            {menuOpen ? (
+              <X className="w-6 h-6 text-gray-800" />
+            ) : (
+              <div className="flex flex-col justify-center items-center">
+                <span className="block w-5 h-[3px] bg-gray-800 rounded mb-[2px]"></span>
+                <span className="block w-5 h-[3px] bg-gray-800 rounded mb-[2px]"></span>
+                <span className="block w-5 h-[3px] bg-gray-800 rounded"></span>
+              </div>
+            )}
+          </button>
+
+          {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
             <GraduationCap className="w-8 h-8 text-blue-600" />
             <span className="text-2xl font-bold text-gray-900">SkillForge</span>
           </Link>
+        </div>
 
-          <div className="flex items-center space-x-4">
+        {/* Right Section — Search + Desktop Menu */}
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => navigate('/search')}
+            className="p-2 rounded-full hover:bg-gray-100 transition"
+            aria-label="Search"
+          >
+            <Search className="w-5 h-5 text-gray-700" />
+          </button>
+
+          {/* Desktop Menu */}
+          <div className="hidden lg:flex items-center space-x-4">
             <Link
               to="/"
               className="text-gray-700 hover:text-blue-600 transition-colors px-3 py-2 rounded-md text-sm font-medium"
@@ -77,7 +117,7 @@ const Navbar = () => {
                 </div>
               </>
             ) : (
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-3">
                 <Link
                   to="/login"
                   className="text-gray-700 hover:text-blue-600 transition-colors px-4 py-2 rounded-md text-sm font-medium"
@@ -95,6 +135,68 @@ const Navbar = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile Dropdown Menu */}
+      {menuOpen && (
+        <div className="lg:hidden bg-white border-t border-gray-200 shadow-inner px-6 py-4 space-y-3">
+          <Link
+            to="/"
+            onClick={() => setMenuOpen(false)}
+            className="block text-gray-700 hover:text-blue-600 text-sm font-medium"
+          >
+            Courses
+          </Link>
+
+          {isAuthenticated ? (
+            <>
+              <Link
+                to="/dashboard"
+                onClick={() => setMenuOpen(false)}
+                className="block text-gray-700 hover:text-blue-600 text-sm font-medium"
+              >
+                Dashboard
+              </Link>
+
+              {user?.role === 'admin' && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMenuOpen(false)}
+                  className="block text-gray-700 hover:text-blue-600 text-sm font-medium"
+                >
+                  Admin
+                </Link>
+              )}
+
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  handleLogout();
+                }}
+                className="block text-gray-700 hover:text-red-600 text-sm font-medium"
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                onClick={() => setMenuOpen(false)}
+                className="block text-gray-700 hover:text-blue-600 text-sm font-medium"
+              >
+                Login
+              </Link>
+              <Link
+                to="/register"
+                onClick={() => setMenuOpen(false)}
+                className="block bg-blue-600 text-white hover:bg-blue-700 text-center py-2 rounded-md text-sm font-medium"
+              >
+                Sign Up
+              </Link>
+            </>
+          )}
+        </div>
+      )}
     </nav>
   );
 };
