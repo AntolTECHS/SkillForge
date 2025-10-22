@@ -1,4 +1,3 @@
-// src/components/Navbar.jsx
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -17,39 +16,34 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  useEffect(() => {
-    console.trace('Navbar rendered');
-  }, []);
-
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  return (
-    <nav
-      id="site-navbar"
-      className="bg-white shadow-md sticky top-0 z-50 w-full"
-      role="navigation"
-      aria-label="Main Navigation"
-    >
-      {/* Main Container — pushed to edges */}
-      <div className="flex justify-between items-center h-16 px-6 sm:px-10 lg:px-16">
+  useEffect(() => {
+    console.trace('Navbar rendered');
+  }, []);
 
-        {/* Left Section — Hamburger + Logo */}
+  return (
+    <nav className="bg-white shadow-md sticky top-0 z-50 w-full">
+      {/* Main container */}
+      <div className="flex justify-between items-center h-16 px-4 sm:px-10 md:px-24 lg:px-32 xl:px-40">
+
+        {/* Left section: Hamburger + Logo */}
         <div className="flex items-center space-x-3">
-          {/* Compact Bold Hamburger Icon with perfect spacing */}
+          {/* Hamburger Menu */}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="block lg:hidden focus:outline-none"
+            className="block lg:hidden focus:outline-none ml-2 sm:ml-0"
             aria-label="Toggle menu"
           >
             {menuOpen ? (
               <X className="w-6 h-6 text-gray-800" />
             ) : (
-              <div className="flex flex-col justify-center items-center">
-                <span className="block w-5 h-[3px] bg-gray-800 rounded mb-[2px]"></span>
-                <span className="block w-5 h-[3px] bg-gray-800 rounded mb-[2px]"></span>
+              <div className="flex flex-col justify-between w-5 h-[14px]">
+                <span className="block w-5 h-[3px] bg-gray-800 rounded"></span>
+                <span className="block w-5 h-[3px] bg-gray-800 rounded"></span>
                 <span className="block w-5 h-[3px] bg-gray-800 rounded"></span>
               </div>
             )}
@@ -62,11 +56,12 @@ const Navbar = () => {
           </Link>
         </div>
 
-        {/* Right Section — Search + Desktop Menu */}
+        {/* Right section: Search + Menu */}
         <div className="flex items-center space-x-4">
+          {/* Search icon */}
           <button
             onClick={() => navigate('/search')}
-            className="p-2 rounded-full hover:bg-gray-100 transition"
+            className="p-2 rounded-full hover:bg-gray-100 transition mr-2 sm:mr-0"
             aria-label="Search"
           >
             <Search className="w-5 h-5 text-gray-700" />
@@ -104,8 +99,11 @@ const Navbar = () => {
                 <div className="flex items-center space-x-3 ml-4 pl-4 border-l border-gray-300">
                   <div className="flex items-center space-x-2">
                     <User className="w-4 h-4 text-gray-600" />
-                    <span className="text-sm font-medium text-gray-700">{user?.name}</span>
+                    <span className="text-sm font-medium text-gray-700">
+                      {user?.name}
+                    </span>
                   </div>
+
                   <button
                     onClick={handleLogout}
                     className="flex items-center space-x-1 text-gray-700 hover:text-red-600 transition-colors px-3 py-2 rounded-md text-sm font-medium"
@@ -138,7 +136,7 @@ const Navbar = () => {
 
       {/* Mobile Dropdown Menu */}
       {menuOpen && (
-        <div className="lg:hidden bg-white border-t border-gray-200 shadow-inner px-6 py-4 space-y-3">
+        <div className="lg:hidden bg-white border-t border-gray-200 shadow-inner px-4 sm:px-10 md:px-24 lg:px-32 xl:px-40 py-4 space-y-3">
           <Link
             to="/"
             onClick={() => setMenuOpen(false)}
