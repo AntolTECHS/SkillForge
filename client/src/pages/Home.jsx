@@ -63,10 +63,10 @@ const Home = () => {
         <div className="px-10 sm:px-16 md:px-24 lg:px-32 xl:px-40 py-16 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
           {/* Left: Text */}
           <div className="text-center lg:text-left space-y-6">
-            {/* Icon + Title aligned closely */}
-            <div className="flex items-center justify-center lg:justify-start space-x-3 mb-4">
+            {/* Icon + Title */}
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start space-y-2 sm:space-y-0 sm:space-x-3 mb-4">
               <BookOpen className="w-12 h-12 text-blue-200" />
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
                 Welcome to SkillForge
               </h1>
             </div>
@@ -154,35 +154,39 @@ const Home = () => {
           </div>
         )}
 
-        <div className="flex justify-between items-center mb-8 flex-wrap gap-2">
+        <div className="flex justify-between items-center mb-8">
           <h2 className="text-3xl font-bold text-gray-900">Featured Courses</h2>
           <p className="text-gray-600">{total} courses available</p>
         </div>
 
-        {/* Responsive Coursera-style grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           {displayCourses.map((course) => (
             <div
               key={course._id}
               onClick={() => handleCourseClick(course)}
-              className="cursor-pointer w-[95%] sm:w-full flex justify-center"
+              className="cursor-pointer flex justify-center"
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === "Enter" && handleCourseClick(course)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCourseClick(course);
+              }}
             >
-              <CourseCard course={course} />
+              <div className="w-full max-w-xs lg:max-w-sm">
+                <CourseCard course={course} />
+              </div>
             </div>
           ))}
 
-          {/* Placeholder cards */}
           {placeholders.map((_, idx) => (
             <div
               key={`placeholder-${idx}`}
               onClick={() => navigate("/register")}
-              className="flex flex-col items-center justify-center border border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-100 transition w-[95%] sm:w-full max-w-sm mx-auto"
+              className="flex flex-col items-center justify-center border border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-100 transition w-full max-w-xs lg:max-w-sm mx-auto"
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === "Enter" && navigate("/register")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") navigate("/register");
+              }}
             >
               <div className="text-3xl text-gray-400 mb-3">🎓</div>
               <h3 className="text-lg font-semibold text-gray-800">
