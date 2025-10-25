@@ -39,6 +39,7 @@ const Home = () => {
   };
 
   const handleGetStarted = () => navigate("/register");
+  const handleExplorePrograms = () => navigate("/courses");
 
   const handleCourseClick = (course) => {
     if (user && user._id) {
@@ -63,7 +64,6 @@ const Home = () => {
         <div className="px-10 sm:px-16 md:px-24 lg:px-32 xl:px-40 py-16 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
           {/* Left: Text */}
           <div className="text-center lg:text-left space-y-6">
-            {/* Icon + Title */}
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start space-y-2 sm:space-y-0 sm:space-x-3 mb-4">
               <BookOpen className="w-12 h-12 text-blue-200" />
               <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
@@ -76,12 +76,20 @@ const Home = () => {
               and advance your career through hands-on learning experiences.
             </p>
 
-            <div className="pt-4">
+            {/* Buttons */}
+            <div className="pt-4 flex flex-wrap justify-center lg:justify-start gap-4">
               <button
                 onClick={handleGetStarted}
                 className="inline-flex items-center rounded-md bg-white text-blue-950 px-6 py-3 font-semibold shadow hover:bg-blue-50 transition"
               >
                 Get Started
+              </button>
+
+              <button
+                onClick={handleExplorePrograms}
+                className="inline-flex items-center rounded-md bg-blue-700 text-white px-6 py-3 font-semibold shadow hover:bg-blue-800 transition"
+              >
+                Explore Programs
               </button>
             </div>
           </div>
