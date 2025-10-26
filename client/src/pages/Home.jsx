@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import axios from "../api/axios";
 import CourseCard from "../components/CourseCard";
 import Loader from "../components/Loader";
-import { AlertCircle, BookOpen } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import HeroSection from "../components/HeroSection"; // ✅ new import
 
 const Home = () => {
   const [courses, setCourses] = useState([]);
@@ -38,9 +39,6 @@ const Home = () => {
     }
   };
 
-  const handleGetStarted = () => navigate("/register");
-  const handleExplorePrograms = () => navigate("/courses");
-
   const handleCourseClick = (course) => {
     if (user && user._id) {
       navigate(`/course/${course._id}`);
@@ -59,51 +57,8 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-950 to-blue-900 text-white">
-        <div className="px-10 sm:px-16 md:px-24 lg:px-32 xl:px-40 py-16 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-          {/* Left: Text */}
-          <div className="text-center lg:text-left space-y-6">
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start space-y-2 sm:space-y-0 sm:space-x-3 mb-4">
-              <BookOpen className="w-12 h-12 text-blue-200" />
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
-                Welcome to SkillForge
-              </h1>
-            </div>
-
-            <p className="text-xl text-blue-100 leading-relaxed max-w-xl mx-auto lg:mx-0">
-              Unlock your potential with expert-led courses. Learn new skills
-              and advance your career through hands-on learning experiences.
-            </p>
-
-            {/* Buttons */}
-            <div className="pt-4 flex flex-wrap justify-center lg:justify-start gap-4">
-              <button
-                onClick={handleGetStarted}
-                className="inline-flex items-center rounded-md bg-white text-blue-950 px-6 py-3 font-semibold shadow hover:bg-blue-50 transition"
-              >
-                Get Started
-              </button>
-
-              <button
-                onClick={handleExplorePrograms}
-                className="inline-flex items-center rounded-md bg-blue-700 text-white px-6 py-3 font-semibold shadow hover:bg-blue-800 transition"
-              >
-                Explore Programs
-              </button>
-            </div>
-          </div>
-
-          {/* Right: Image */}
-          <div className="flex justify-center lg:justify-end">
-            <img
-              src="https://images.unsplash.com/photo-1553877522-43269d4ea984?auto=format&fit=crop&w=1200&q=80"
-              alt="Learning Illustration"
-              className="w-full max-w-lg rounded-lg shadow-lg object-cover"
-            />
-          </div>
-        </div>
-      </div>
+      {/* ✅ Reusable Hero Section */}
+      <HeroSection />
 
       {/* Why Choose Section */}
       <div className="bg-white shadow-md rounded-lg py-16 mb-12">
@@ -112,41 +67,42 @@ const Home = () => {
             Why Choose SkillForge?
           </h2>
           <p className="text-lg text-gray-700 max-w-2xl mx-auto mb-12">
-            We empower learners with practical skills, expert instructors, and a
-            community-driven experience.
+            We empower learners through engaging micro-courses, peer
+            collaboration, and real-world mentorship designed to accelerate your
+            growth.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
             <div className="bg-gray-50 rounded-lg p-6 hover:shadow-lg transition transform hover:scale-105">
               <div className="text-4xl mb-4">🚀</div>
               <h3 className="text-xl font-semibold mb-2 text-gray-900">
-                Fast Learning
+                Learn Faster
               </h3>
               <p className="text-gray-700">
-                Get up to speed with practical, bite-sized courses designed for
-                immediate impact.
+                Access practical, bite-sized courses designed for immediate
+                application in your career.
               </p>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-6 hover:shadow-lg transition transform hover:scale-105">
-              <div className="text-4xl mb-4">👩‍🏫</div>
+              <div className="text-4xl mb-4">🤝</div>
               <h3 className="text-xl font-semibold mb-2 text-gray-900">
-                Expert Instructors
+                Peer Collaboration
               </h3>
               <p className="text-gray-700">
-                Learn from industry leaders with real-world experience and
-                guidance at every step.
+                Grow alongside like-minded learners, share ideas, and learn from
+                one another.
               </p>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-6 hover:shadow-lg transition transform hover:scale-105">
               <div className="text-4xl mb-4">💡</div>
               <h3 className="text-xl font-semibold mb-2 text-gray-900">
-                Career Growth
+                Real-World Skills
               </h3>
               <p className="text-gray-700">
-                Acquire skills that boost your career, with certificates to
-                showcase your achievements.
+                Gain relevant, actionable skills that empower you to thrive in
+                your profession.
               </p>
             </div>
           </div>
@@ -163,8 +119,10 @@ const Home = () => {
         )}
 
         <div className="flex justify-between items-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900">Featured Courses</h2>
-          <p className="text-gray-600">{total} courses available</p>
+          <h2 className="text-3xl font-bold text-gray-900">
+            Featured Programs
+          </h2>
+          <p className="text-gray-600">{total} available</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
@@ -198,10 +156,10 @@ const Home = () => {
             >
               <div className="text-3xl text-gray-400 mb-3">🎓</div>
               <h3 className="text-lg font-semibold text-gray-800">
-                Become a member
+                Join SkillForge
               </h3>
               <p className="text-sm text-gray-500 mt-2">
-                Sign up to access more courses and enroll instantly.
+                Sign up to unlock all programs and start learning today.
               </p>
               <button
                 className="mt-4 inline-flex items-center rounded bg-blue-950 text-white px-4 py-2 text-sm font-medium hover:bg-blue-900 transition"

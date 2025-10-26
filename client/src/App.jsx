@@ -9,6 +9,8 @@ import Dashboard from './pages/Dashboard';
 import CourseDetails from './pages/CourseDetails';
 import PaymentSuccess from './pages/PaymentSuccess';
 import AdminPanel from './pages/AdminPanel';
+import Courses from "./pages/Courses";
+
 
 function App() {
   return (
@@ -22,6 +24,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/course/:id" element={<CourseDetails />} />
             <Route path="/payment/success" element={<PaymentSuccess />} />
+            <Route path="/courses" element={<Courses />} />
             <Route
               path="/dashboard"
               element={
