@@ -8,7 +8,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import CourseDetails from './pages/CourseDetails';
 import PaymentSuccess from './pages/PaymentSuccess';
-import AdminPanel from './pages/AdminPanel';
+import AdminPanel from './pages/AdminDashboard';
 import Courses from "./pages/Courses";
 
 
