@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "../api/axios";
 import { motion } from "framer-motion";
@@ -20,6 +20,16 @@ import {
   XCircle,
   Award,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+} from "recharts";
 
 const NAV_ITEMS = [
   { key: "Overview", Icon: BarChart2 },
@@ -208,7 +218,6 @@ export default function AdminDashboard() {
       let ok = true;
       for (const part of parts) {
         if (cur == null) { ok = false; break; }
-        // support optional chaining-like "payment?.paid" in paths
         const cleanPart = part.replace(/\?$/, "");
         cur = cur[cleanPart];
       }
@@ -216,6 +225,82 @@ export default function AdminDashboard() {
     }
     return undefined;
   };
+
+  const normalizeList = (data) => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+
+    // common shapes
+    const candidates = [
+      data.enrollments,
+      data.results,
+      data.data,
+      data.rows,
+      data.items,
+      data.documents,
+      data.records,
+      data.list,
+    ];
+
+    for (const c of candidates) {
+      if (Array.isArray(c)) return c;
+    }
+
+    if (data.data && typeof data.data === 'object') {
+      const nested = normalizeList(data.data);
+      if (nested.length) return nested;
+    }
+
+    if (typeof data === 'object') return [data];
+
+    return [];
+  };
+
+  const fetchAllEnrollments = useCallback(async () => {
+    try {
+      const tryUrls = [
+        "/admin/enrollments?limit=10000",
+        "/enrollments?limit=10000",
+        "/admin/enrollments?perPage=10000",
+        "/enrollments?perPage=10000",
+      ];
+
+      for (const url of tryUrls) {
+        try {
+          const res = await axios.get(url);
+          const d = res.data ?? res;
+          const list = normalizeList(d);
+          if (list.length) { setEnrollments(list); return list; }
+        } catch (e) {
+          // ignore and try next
+        }
+      }
+
+      const accumulated = [];
+      let page = 1;
+      const pageSize = 200;
+      for (let i = 0; i < 25; i++) {
+        try {
+          const res = await axios.get(`/admin/enrollments?page=${page}&limit=${pageSize}`).catch(() => axios.get(`/enrollments?page=${page}&limit=${pageSize}`));
+          const d = res.data ?? res;
+          const list = normalizeList(d);
+          if (!list || list.length === 0) break;
+          accumulated.push(...list);
+          if (list.length < pageSize) break;
+          page += 1;
+        } catch (e) { break; }
+      }
+
+      if (accumulated.length) {
+        setEnrollments(accumulated);
+        return accumulated;
+      }
+
+    } catch (e) {
+      console.warn('fetchAllEnrollments failed', e);
+    }
+    return [];
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -276,7 +361,13 @@ export default function AdminDashboard() {
         : coursesData?.courses ?? coursesData?.data ?? coursesData ?? [];
       setCourses(normalizedCourses);
 
-      setEnrollments(Array.isArray(enrollmentsData) ? enrollmentsData : enrollmentsData?.data ?? []);
+      const eList = normalizeList(enrollmentsData);
+      if (eList.length) setEnrollments(eList);
+      else {
+        const attempted = await fetchAllEnrollments();
+        if (!attempted.length) setEnrollments(Array.isArray(enrollmentsData) ? enrollmentsData : enrollmentsData?.data ?? []);
+      }
+
       setAttendance(Array.isArray(attendanceData) ? attendanceData : attendanceData?.data ?? []);
       setAssignments(Array.isArray(assignmentsData) ? assignmentsData : assignmentsData?.data ?? []);
       setPayments(Array.isArray(paymentsData) ? paymentsData : paymentsData?.data ?? []);
@@ -289,7 +380,7 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchAllEnrollments]);
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem("token");
@@ -450,6 +541,112 @@ export default function AdminDashboard() {
     }
   }, [fetchAllData]);
 
+  // --- analytics helpers for per-tab involvement ---
+  const formatMonth = (d) => {
+    const dt = new Date(d);
+    return dt.toLocaleString(undefined, { month: 'short', year: 'numeric' });
+  };
+
+  const getLastNMonths = (n = 6) => {
+    const res = [];
+    const now = new Date();
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      res.push(d);
+    }
+    return res;
+  };
+
+  // compute involvement counts per tab for the last `months` months
+  const computeInvolvement = ({ months = 6 } = {}) => {
+    const buckets = getLastNMonths(months).map((d) => ({
+      monthLabel: formatMonth(d),
+      instructors: 0,
+      courses: 0,
+      enrollments: 0,
+      attendance: 0,
+      assignments: 0,
+      payments: 0,
+      certificates: 0,
+      users: 0,
+    }));
+
+    const findBucket = (dateStr) => {
+      if (!dateStr) return null;
+      const d = new Date(dateStr);
+      if (isNaN(d)) return null;
+      const label = formatMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+      return buckets.find((b) => b.monthLabel === label) ?? null;
+    };
+
+    // helpers to increment by list and date fields
+    const bump = (list, datePaths, key) => {
+      (list || []).forEach((item) => {
+        const date = pick(item, datePaths) || item.createdAt || item.created_at || item.date || item.publishedAt || item.paidAt;
+        const b = findBucket(date);
+        if (b) b[key] += 1;
+      });
+    };
+
+    bump(instructors, ["createdAt", "created_at", "date"], 'instructors');
+    bump(courses, ["createdAt", "created_at", "publishedAt", "date"], 'courses');
+    bump(enrollments, ["createdAt", "enrolledAt", "created_at", "date"], 'enrollments');
+    bump(attendance, ["date", "createdAt", "created_at"], 'attendance');
+    bump(assignments, ["createdAt", "created_at", "dueDate", "due_date"], 'assignments');
+    // payments: count transactions
+    (payments || []).forEach((p) => {
+      const date = pick(p, ["createdAt", "date", "paidAt", "created_at"]) || p.date;
+      const b = findBucket(date);
+      if (b) b.payments += 1;
+    });
+    bump(certificates, ["issuedAt", "createdAt", "created_at"], 'certificates');
+    bump(users, ["createdAt", "created_at", "registeredAt", "date"], 'users');
+
+    return buckets;
+  };
+
+  const MultiSeriesChart = ({ months = 6 }) => {
+    const data = useMemo(() => computeInvolvement({ months }), [enrollments, instructors, courses, attendance, assignments, payments, certificates, users, months]);
+
+    // list of series to draw (ordered)
+    const series = [
+      { key: 'enrollments', name: 'Enrollments' },
+      { key: 'users', name: 'Users' },
+      { key: 'instructors', name: 'Instructors' },
+      { key: 'courses', name: 'Courses' },
+      { key: 'attendance', name: 'Attendance' },
+      { key: 'assignments', name: 'Assignments' },
+      { key: 'payments', name: 'Payments' },
+      { key: 'certificates', name: 'Certificates' },
+    ];
+
+    const strokes = ['#2563eb', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#7c3aed', '#e11d48'];
+
+    return (
+      <Card className="w-full">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="font-semibold">Engagement by section (last {months} months)</h4>
+          <div className="text-sm text-gray-500">Curves show monthly counts for each admin tab</div>
+        </div>
+
+        <div style={{ height: 300 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="monthLabel" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              {series.map((s, i) => (
+                <Line key={s.key} type="monotone" dataKey={s.key} name={s.name} stroke={strokes[i % strokes.length]} strokeWidth={2} dot={{ r: 3 }} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+    );
+  };
+
   const Sidebar = () => (
     <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-gradient-to-b from-blue-900 to-blue-800 text-white transform transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
       <div className="flex items-center justify-between px-6 py-5 border-b border-blue-700">
@@ -480,6 +677,8 @@ export default function AdminDashboard() {
   const OverviewTab = () => {
     const preview = (items) => (Array.isArray(items) ? items.slice(0, 3) : []);
 
+    const totalLearners = overview.totalUsers ?? overview.users ?? users.length;
+
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -490,7 +689,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <StatCard title="Total Learners" value={overview.totalUsers ?? overview.users ?? users.length} icon={Users} theme="teal" />
+          <StatCard title="Total Learners" value={totalLearners} icon={Users} theme="teal" />
           <StatCard title="Instructors" value={overview.totalInstructors ?? instructors.length} icon={UserPlus} theme="purple" />
           <StatCard title="Courses" value={overview.totalCourses ?? courses.length} icon={BookOpen} theme="amber" />
         </div>
@@ -560,6 +759,9 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Multi-series analytics chart placed at the BOTTOM of the Overview tab */}
+        <MultiSeriesChart months={6} />
       </div>
     );
   };
@@ -636,7 +838,6 @@ export default function AdminDashboard() {
     </Card>
   );
 
-  // --- Updated EnrollmentsTab: show full name, email, course, instructor, date, payment status ---
   const EnrollmentsTab = () => (
     <Card>
       <div className="flex items-center justify-between mb-4">
