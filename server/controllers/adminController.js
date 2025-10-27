@@ -1,45 +1,91 @@
-// controllers/adminController.js
+// server/controllers/adminController.js
+
 import User from "../models/User.js";
 import { generateRandomPassword } from "../utils/randomPassword.js";
 import { sendEmail } from "../utils/sendEmail.js";
 
-// Add a teacher
-export const addTeacher = async (req, res) => {
+/**
+ * @desc   Add a new instructor
+ * @route  POST /api/admin/instructors
+ * @access Admin
+ */
+export const addInstructor = async (req, res) => {
   try {
     const { name, email } = req.body;
 
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User with this email already exists" });
+    }
+
+    // Generate random password for new instructor
     const password = generateRandomPassword();
-    const teacher = await User.create({
+
+    const instructor = await User.create({
       name,
       email,
-      role: "teacher",
+      role: "instructor",
       password,
     });
 
-    // Optionally, send email with password
-    await sendEmail(email, "Your account has been created", `Password: ${password}`);
+    // Send email with credentials (optional)
+    try {
+      await sendEmail({
+        to: email,
+        subject: "Your Instructor Account Has Been Created",
+        text: `Hello ${name},\n\nYour instructor account has been created.\nLogin credentials:\nEmail: ${email}\nPassword: ${password}\n\nPlease change your password after logging in.`,
+      });
+    } catch (emailError) {
+      console.error("Email failed to send:", emailError.message);
+    }
 
-    res.status(201).json({ message: "Teacher created", teacher });
+    res.status(201).json({ message: "Instructor created successfully", instructor });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Error creating instructor:", error);
+    res.status(500).json({ message: "Failed to create instructor" });
   }
 };
 
-// Get all users
+/**
+ * @desc   Get all users
+ * @route  GET /api/admin/users
+ * @access Admin
+ */
 export const getAllUsers = async (req, res) => {
-  const users = await User.find();
-  res.json(users);
+  try {
+    const users = await User.find().select("-password");
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch users" });
+  }
 };
 
-// Get all teachers
-export const getAllTeachers = async (req, res) => {
-  const teachers = await User.find({ role: "teacher" });
-  res.json(teachers);
+/**
+ * @desc   Get all instructors
+ * @route  GET /api/admin/instructors
+ * @access Admin
+ */
+export const getAllInstructors = async (req, res) => {
+  try {
+    const instructors = await User.find({ role: "instructor" }).select("-password");
+    res.json(instructors);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch instructors" });
+  }
 };
 
-// Delete a user
+/**
+ * @desc   Delete a user by ID
+ * @route  DELETE /api/admin/user/:id
+ * @access Admin
+ */
 export const deleteUser = async (req, res) => {
-  const { id } = req.params;
-  await User.findByIdAndDelete(id);
-  res.json({ message: "User deleted" });
+  try {
+    const { id } = req.params;
+    await User.findByIdAndDelete(id);
+    res.json({ message: "User deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete user" });
+  }
 };
