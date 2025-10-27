@@ -13,13 +13,15 @@ export const addInstructor = async (req, res) => {
   try {
     const { name, email } = req.body;
 
-    // Check if user already exists
+    // Check if the user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: "User with this email already exists" });
+      return res
+        .status(400)
+        .json({ message: "User with this email already exists" });
     }
 
-    // Generate random password for new instructor
+    // Generate a random password for the new instructor
     const password = generateRandomPassword();
 
     const instructor = await User.create({
@@ -27,20 +29,30 @@ export const addInstructor = async (req, res) => {
       email,
       role: "instructor",
       password,
+      createdByAdmin: true,
+      isFirstLogin: true,
     });
 
-    // Send email with credentials (optional)
+    // Attempt to send credentials via email
     try {
       await sendEmail({
         to: email,
         subject: "Your Instructor Account Has Been Created",
-        text: `Hello ${name},\n\nYour instructor account has been created.\nLogin credentials:\nEmail: ${email}\nPassword: ${password}\n\nPlease change your password after logging in.`,
+        text: `Hello ${name},\n\nYour instructor account has been created.\nLogin credentials:\nEmail: ${email}\nPassword: ${password}\n\nPlease change your password after logging in.\n\n— SkillForge Team`,
       });
     } catch (emailError) {
-      console.error("Email failed to send:", emailError.message);
+      console.warn("Email sending failed:", emailError.message);
     }
 
-    res.status(201).json({ message: "Instructor created successfully", instructor });
+    res.status(201).json({
+      message: "Instructor created successfully",
+      instructor: {
+        id: instructor._id,
+        name: instructor.name,
+        email: instructor.email,
+        role: instructor.role,
+      },
+    });
   } catch (error) {
     console.error("Error creating instructor:", error);
     res.status(500).json({ message: "Failed to create instructor" });
@@ -57,6 +69,7 @@ export const getAllUsers = async (req, res) => {
     const users = await User.find().select("-password");
     res.json(users);
   } catch (error) {
+    console.error("Error fetching users:", error);
     res.status(500).json({ message: "Failed to fetch users" });
   }
 };
@@ -68,9 +81,12 @@ export const getAllUsers = async (req, res) => {
  */
 export const getAllInstructors = async (req, res) => {
   try {
-    const instructors = await User.find({ role: "instructor" }).select("-password");
+    const instructors = await User.find({ role: "instructor" }).select(
+      "-password"
+    );
     res.json(instructors);
   } catch (error) {
+    console.error("Error fetching instructors:", error);
     res.status(500).json({ message: "Failed to fetch instructors" });
   }
 };
@@ -83,9 +99,15 @@ export const getAllInstructors = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    await User.findByIdAndDelete(id);
+    const deletedUser = await User.findByIdAndDelete(id);
+
+    if (!deletedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     res.json({ message: "User deleted successfully" });
   } catch (error) {
+    console.error("Error deleting user:", error);
     res.status(500).json({ message: "Failed to delete user" });
   }
 };

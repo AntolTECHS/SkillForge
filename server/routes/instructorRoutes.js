@@ -1,3 +1,4 @@
+// server/routes/instructorRoutes.js
 import express from "express";
 import {
   createCourse,
@@ -11,7 +12,7 @@ import { authorizeRoles } from "../middlewares/roleMiddleware.js";
 
 const router = express.Router();
 
-router.use(protect, authorizeRoles("teacher"));
+router.use(protect, authorizeRoles("instructor"));
 
 router.post("/courses", createCourse);
 router.put("/courses/:id", updateCourse);

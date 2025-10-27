@@ -9,7 +9,7 @@ import { errorHandler } from "./utils/errorHandler.js";
 // Routes
 import authRoutes from "./routes/authRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
-import teacherRoutes from "./routes/teacherRoutes.js";
+import instructorRoutes from "./routes/instructorRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import courseRoutes from "./routes/courseRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
@@ -37,7 +37,7 @@ app.get("/", (req, res) => {
 // Register API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/teacher", teacherRoutes);
+app.use("/api/instructors", instructorRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/payment", paymentRoutes);

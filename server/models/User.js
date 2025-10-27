@@ -24,13 +24,13 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["student", "teacher", "admin"],
+      enum: ["student", "teacher", "instructor", "admin"],
       default: "student",
     },
 
     isFirstLogin: {
       type: Boolean,
-      default: false, // true for teachers added by admin
+      default: false,
     },
 
     createdByAdmin: {
