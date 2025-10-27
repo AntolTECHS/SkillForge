@@ -186,8 +186,36 @@ export default function AdminDashboard() {
   const [certificates, setCertificates] = useState([]);
 
   const [editingInstructor, setEditingInstructor] = useState(null);
+  const [processingIds, setProcessingIds] = useState([]); // track ids for button disabling
 
   const navigate = useNavigate();
+
+  // --- helpers ---
+  const formatDate = (d) => {
+    if (!d) return "—";
+    try {
+      return new Date(d).toLocaleDateString();
+    } catch {
+      return String(d);
+    }
+  };
+
+  const pick = (obj, paths = []) => {
+    if (!obj) return undefined;
+    for (const p of paths) {
+      const parts = p.split(".");
+      let cur = obj;
+      let ok = true;
+      for (const part of parts) {
+        if (cur == null) { ok = false; break; }
+        // support optional chaining-like "payment?.paid" in paths
+        const cleanPart = part.replace(/\?$/, "");
+        cur = cur[cleanPart];
+      }
+      if (ok && cur !== undefined && cur !== null) return cur;
+    }
+    return undefined;
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -196,9 +224,7 @@ export default function AdminDashboard() {
       await fetchAllData();
     };
     run();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
@@ -271,10 +297,14 @@ export default function AdminDashboard() {
     navigate("/login");
   }, [navigate]);
 
+  const addProcessing = (id) => setProcessingIds((s) => Array.from(new Set([...s, id])));
+  const removeProcessing = (id) => setProcessingIds((s) => s.filter((x) => x !== id));
+  const isProcessing = (id) => processingIds.includes(id);
+
   const saveInstructor = useCallback(async (form) => {
     try {
       if (editingInstructor && editingInstructor._id) {
-        await axios.put(`/admin/instructors/${editingInstructor._id}`, form).catch(() => axios.put(`/instructors/${editingInstructor._1d}`, form));
+        await axios.put(`/admin/instructors/${editingInstructor._id}`, form).catch(() => axios.put(`/instructors/${editingInstructor._id}`, form));
         setEditingInstructor(null);
       } else {
         await axios.post("/admin/instructors", form).catch(() => axios.post("/instructors", form));
@@ -293,59 +323,78 @@ export default function AdminDashboard() {
 
   const deleteInstructor = useCallback(async (id) => {
     if (!confirm("Delete this instructor? This will not automatically delete their courses.")) return;
+    addProcessing(id);
     try {
       await axios.delete(`/admin/instructors/${id}`).catch(() => axios.delete(`/instructors/${id}`));
       await fetchAllData();
     } catch (err) {
       alert("Failed to delete instructor");
+    } finally {
+      removeProcessing(id);
     }
   }, [fetchAllData]);
 
   const unenrollStudent = useCallback(async (enrollmentId) => {
     if (!confirm("Unenroll this student?")) return;
+    addProcessing(enrollmentId);
     try {
       await axios.delete(`/admin/enrollments/${enrollmentId}`).catch(() => axios.delete(`/enrollments/${enrollmentId}`));
       await fetchAllData();
     } catch (err) {
       alert("Failed to unenroll student");
+    } finally {
+      removeProcessing(enrollmentId);
     }
   }, [fetchAllData]);
 
   const markAttendance = useCallback(async (courseId, date, studentId, present = true) => {
+    const key = `${courseId}-${studentId}-${date}`;
+    addProcessing(key);
     try {
       await axios.post("/instructor/attendance", { courseId, date, studentId, present }).catch(() => axios.post("/admin/attendance", { courseId, date, studentId, present }));
       await fetchAllData();
     } catch (err) {
       alert("Failed to mark attendance");
+    } finally {
+      removeProcessing(key);
     }
   }, [fetchAllData]);
 
   const gradeSubmission = useCallback(async (submissionId, grade) => {
+    addProcessing(submissionId);
     try {
       await axios.post(`/admin/assignments/${submissionId}/grade`, { grade });
       await fetchAllData();
     } catch (err) {
       alert("Failed to grade");
+    } finally {
+      removeProcessing(submissionId);
     }
   }, [fetchAllData]);
 
   const approvePayout = useCallback(async (paymentId) => {
     if (!confirm("Approve payout to instructor?")) return;
+    addProcessing(paymentId);
     try {
       await axios.post(`/admin/payments/${paymentId}/approve`);
       await fetchAllData();
     } catch (err) {
       alert("Failed to approve payout");
+    } finally {
+      removeProcessing(paymentId);
     }
   }, [fetchAllData]);
 
   const refundPayment = useCallback(async (paymentId) => {
     if (!confirm("Refund this payment?")) return;
+    addProcessing(paymentId);
     try {
-      await axios.post(`/admin/payments/${paymentId}/refund`);
+      await axios.post(`/admin/payments/${paymentId}/refund`).catch(() => axios.post(`/payments/${paymentId}/refund`));
       await fetchAllData();
     } catch (err) {
       alert("Failed to refund");
+    } finally {
+      removeProcessing(paymentId);
     }
   }, [fetchAllData]);
 
@@ -365,30 +414,39 @@ export default function AdminDashboard() {
 
   const revokeCertificate = useCallback(async (certId) => {
     if (!confirm("Revoke this certificate?")) return;
+    addProcessing(certId);
     try {
       await axios.delete(`/admin/certificates/${certId}`).catch(() => axios.delete(`/certificates/${certId}`));
       await fetchAllData();
     } catch (err) {
       alert("Failed to revoke certificate");
+    } finally {
+      removeProcessing(certId);
     }
   }, [fetchAllData]);
 
   const updateUserRole = useCallback(async (id, role) => {
+    addProcessing(id);
     try {
       await axios.put(`/admin/users/${id}`, { role }).catch(() => axios.put(`/users/${id}`, { role }));
       await fetchAllData();
     } catch (err) {
       alert("Failed to update user role");
+    } finally {
+      removeProcessing(id);
     }
   }, [fetchAllData]);
 
   const deleteUser = useCallback(async (id) => {
     if (!confirm("Delete this user?")) return;
+    addProcessing(id);
     try {
       await axios.delete(`/admin/users/${id}`).catch(() => axios.delete(`/users/${id}`));
       await fetchAllData();
     } catch (err) {
       alert("Failed to delete user");
+    } finally {
+      removeProcessing(id);
     }
   }, [fetchAllData]);
 
@@ -535,7 +593,7 @@ export default function AdminDashboard() {
                     <button onClick={() => editInstructor(inst)} className="px-2 py-2 bg-gray-100 rounded hover:bg-gray-200" title="Edit">
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button onClick={() => deleteInstructor(inst._id)} className="px-2 py-2 bg-red-600 text-white rounded hover:bg-red-500" title="Delete">
+                    <button disabled={isProcessing(inst._id)} onClick={() => deleteInstructor(inst._id)} className="px-2 py-2 bg-red-600 text-white rounded hover:bg-red-500" title="Delete">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -578,9 +636,14 @@ export default function AdminDashboard() {
     </Card>
   );
 
+  // --- Updated EnrollmentsTab: show full name, email, course, instructor, date, payment status ---
   const EnrollmentsTab = () => (
     <Card>
-      <h3 className="text-lg font-semibold mb-4">Enrollments ({enrollments.length})</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold">Enrollments ({enrollments.length})</h3>
+        <div className="text-sm text-gray-500">Manage enrolled students</div>
+      </div>
+
       {enrollments.length === 0 ? (
         <p className="text-gray-500">No enrollments yet.</p>
       ) : (
@@ -588,25 +651,89 @@ export default function AdminDashboard() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-600">
-                <th className="p-2">Student</th>
+                <th className="p-2">Full name</th>
+                <th>Email</th>
                 <th>Course</th>
                 <th>Instructor</th>
                 <th>Date</th>
+                <th>Payment</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {enrollments.map((en) => (
-                <tr key={en._id ?? `en-${en.courseTitle ?? en.studentEmail ?? Math.random()}`} className="border-t">
-                  <td className="p-2">{en.studentName || en.student?.name || en.studentEmail}</td>
-                  <td>{en.courseTitle || en.course?.title}</td>
-                  <td>{en.instructorName || en.course?.instructor?.name}</td>
-                  <td>{new Date(en.createdAt || en.enrolledAt || Date.now()).toLocaleDateString()}</td>
-                  <td className="p-2">
-                    <button onClick={() => unenrollStudent(en._id)} className="px-2 py-1 bg-red-600 text-white rounded text-xs">Unenroll</button>
-                  </td>
-                </tr>
-              ))}
+              {enrollments.map((en, idx) => {
+                const fullName =
+                  pick(en, ["studentName", "student.name", "student.fullName", "user.name", "name"]) ||
+                  en.studentEmail ||
+                  en.email ||
+                  `Student #${idx + 1}`;
+
+                const email =
+                  pick(en, ["student.email", "studentEmail", "user.email", "email"]) ||
+                  "—";
+
+                const courseTitle =
+                  pick(en, ["courseTitle", "course.title", "title"]) ||
+                  "—";
+
+                const instructorName =
+                  pick(en, ["instructorName", "course.instructor.name", "course.teacherName", "instructor.name", "teacherName"]) ||
+                  "—";
+
+                const date = formatDate(pick(en, ["createdAt", "enrolledAt", "date"]));
+
+                const paymentStatusRaw =
+                  pick(en, ["paymentStatus", "status", "payment.status", "transaction.status"]) ||
+                  (pick(en, ["payment", "transaction"]) ? "completed" : undefined);
+
+                let paymentStatus = "Unknown";
+                if (paymentStatusRaw) {
+                  const ps = String(paymentStatusRaw).toLowerCase();
+                  if (["paid", "completed", "success"].some(s => ps.includes(s))) paymentStatus = "Paid";
+                  else if (["pending", "unpaid", "processing"].some(s => ps.includes(s))) paymentStatus = "Pending";
+                  else if (["refunded", "failed", "cancelled", "canceled"].some(s => ps.includes(s))) paymentStatus = "Refunded/Failed";
+                  else paymentStatus = String(paymentStatusRaw);
+                } else {
+                  const paidFlag = pick(en, ["paid", "isPaid", "payment?.paid"]);
+                  paymentStatus = paidFlag ? "Paid" : "Pending";
+                }
+
+                const id = en._id ?? en.id ?? en.enrollmentId ?? `en-${idx}`;
+
+                return (
+                  <tr key={id} className="border-t">
+                    <td className="p-2">{fullName}</td>
+                    <td>{email}</td>
+                    <td>{courseTitle}</td>
+                    <td>{instructorName}</td>
+                    <td>{date}</td>
+                    <td>{paymentStatus}</td>
+                    <td className="p-2">
+                      <div className="flex gap-2">
+                        <button
+                          disabled={isProcessing(id)}
+                          onClick={() => unenrollStudent(id)}
+                          className="px-2 py-1 bg-red-600 text-white rounded text-xs"
+                        >
+                          Unenroll
+                        </button>
+
+                        {pick(en, ["payment", "transaction", "paymentId", "transactionId"]) && (
+                          <button
+                            onClick={() => {
+                              const payId = pick(en, ["payment._id", "payment.id", "transaction._id", "transaction.id", "paymentId", "transactionId"]);
+                              if (payId) navigate(`/admin/payments/${payId}`);
+                            }}
+                            className="px-2 py-1 bg-gray-200 rounded text-xs"
+                          >
+                            View Payment
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -636,7 +763,7 @@ export default function AdminDashboard() {
                   <div className="text-sm">{r.studentName}</div>
                   <div className="flex gap-2 items-center">
                     {r.present ? <Check className="text-green-600" /> : <XCircle className="text-red-600" />}
-                    <button onClick={() => markAttendance(a.courseId || a.course?._id, a.date, r.studentId, !r.present)} className="text-xs text-blue-600">Toggle</button>
+                    <button disabled={isProcessing(`${a.courseId}-${r.studentId}-${a.date}`)} onClick={() => markAttendance(a.courseId || a.course?._id, a.date, r.studentId, !r.present)} className="text-xs text-blue-600">Toggle</button>
                   </div>
                 </div>
               ))}
@@ -697,8 +824,8 @@ export default function AdminDashboard() {
                   <td>{new Date(p.date || p.createdAt).toLocaleDateString()}</td>
                   <td>{p.status || "completed"}</td>
                   <td className="p-2 flex gap-2">
-                    <button onClick={() => approvePayout(p._id)} className="px-2 py-1 bg-green-600 text-white rounded text-xs">Approve</button>
-                    <button onClick={() => refundPayment(p._1d)} className="px-2 py-1 bg-red-600 text-white rounded text-xs">Refund</button>
+                    <button disabled={isProcessing(p._id)} onClick={() => approvePayout(p._id)} className="px-2 py-1 bg-green-600 text-white rounded text-xs">Approve</button>
+                    <button disabled={isProcessing(p._id)} onClick={() => refundPayment(p._id)} className="px-2 py-1 bg-red-600 text-white rounded text-xs">Refund</button>
                   </td>
                 </tr>
               ))}
@@ -727,7 +854,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex gap-2">
                   <a href={c.url || c.certificateUrl} target="_blank" rel="noreferrer" className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm">View</a>
-                  <button onClick={() => revokeCertificate(c._id)} className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm">Revoke</button>
+                  <button disabled={isProcessing(c._id)} onClick={() => revokeCertificate(c._id)} className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm">Revoke</button>
                 </div>
               </div>
             ))}
@@ -757,7 +884,7 @@ export default function AdminDashboard() {
                   <option value="instructor">Instructor</option>
                   <option value="admin">Admin</option>
                 </select>
-                <button onClick={() => deleteUser(u._id)} className="px-2 py-2 bg-red-600 text-white rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                <button disabled={isProcessing(u._id)} onClick={() => deleteUser(u._id)} className="px-2 py-2 bg-red-600 text-white rounded-lg"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
           ))}
