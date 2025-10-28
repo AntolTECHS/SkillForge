@@ -22,22 +22,26 @@ const userSchema = new mongoose.Schema(
       minlength: 6,
     },
 
+    // Roles allowed: student, instructor, admin
     role: {
       type: String,
-      enum: ["student", "teacher", "instructor", "admin"],
+      enum: ["student", "instructor", "admin"],
       default: "student",
     },
 
+    // 👇 For instructors added by admin who must change password on first login
     isFirstLogin: {
       type: Boolean,
       default: false,
     },
 
+    // 👇 Indicates if this account was created by an admin
     createdByAdmin: {
       type: Boolean,
       default: false,
     },
 
+    // 👇 Allows deactivating accounts (e.g. suspend student/instructor)
     isActive: {
       type: Boolean,
       default: true,
@@ -46,7 +50,7 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Hash password before save
+// 🔐 Hash password before saving
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   const salt = await bcrypt.genSalt(10);
@@ -54,7 +58,7 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// Compare passwords
+// 🔑 Compare passwords
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };

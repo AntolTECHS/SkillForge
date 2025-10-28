@@ -11,15 +11,16 @@ import PaymentSuccess from './pages/PaymentSuccess';
 import AdminPanel from './pages/AdminDashboard';
 import Courses from './pages/Courses';
 import InstructorDashboard from './pages/InstructorDashboard';
+import ChangePassword from './pages/ChangePassword'; // ✅ new import
 
-// This helper component decides when to show the Navbar
 function AppLayout() {
   const location = useLocation();
-  const hideNavbar = location.pathname.startsWith('/admin'); // Hide navbar for admin pages
+  const hideNavbar = location.pathname.startsWith('/admin'); // hide navbar for admin
 
   return (
     <div className="min-h-screen bg-gray-50">
       {!hideNavbar && <Navbar />}
+
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Home />} />
@@ -29,7 +30,7 @@ function AppLayout() {
         <Route path="/payment/success" element={<PaymentSuccess />} />
         <Route path="/courses" element={<Courses />} />
 
-        {/* Protected (any logged-in user) */}
+        {/* Protected: any logged-in user */}
         <Route
           path="/dashboard"
           element={
@@ -45,6 +46,16 @@ function AppLayout() {
           element={
             <ProtectedRoute allowedRoles={['instructor']}>
               <InstructorDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ✅ New: Change password page (for instructors on first login) */}
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute allowedRoles={['instructor']}>
+              <ChangePassword />
             </ProtectedRoute>
           }
         />
