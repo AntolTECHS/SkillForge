@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+// AdminDashboard.jsx
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "../api/axios";
 import { motion } from "framer-motion";
@@ -14,7 +15,6 @@ import {
   LayoutDashboard,
   DollarSign,
   CalendarCheck,
-  FileText,
   BarChart2,
   Check,
   XCircle,
@@ -31,16 +31,74 @@ import {
   Legend,
 } from "recharts";
 
+/* -------------------------
+   Pure helpers (defined before hooks so no hoisting issues)
+   ------------------------- */
+function pick(obj, paths = []) {
+  if (!obj) return undefined;
+  for (const p of paths) {
+    const parts = p.split(".");
+    let cur = obj;
+    let ok = true;
+    for (const part of parts) {
+      if (cur == null) { ok = false; break; }
+      const cleanPart = part.replace(/\?$/, "");
+      cur = cur[cleanPart];
+    }
+    if (ok && cur !== undefined && cur !== null) return cur;
+  }
+  return undefined;
+}
+
+function normalizeList(data) {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+
+  const candidates = [
+    data.enrollments,
+    data.results,
+    data.data,
+    data.rows,
+    data.items,
+    data.documents,
+    data.records,
+    data.list,
+  ];
+
+  for (const c of candidates) {
+    if (Array.isArray(c)) return c;
+  }
+
+  if (data.data && typeof data.data === "object") {
+    const nested = normalizeList(data.data);
+    if (nested.length) return nested;
+  }
+
+  if (typeof data === "object") return [data];
+  return [];
+}
+
+function formatDate(d) {
+  if (!d) return "—";
+  try {
+    return new Date(d).toLocaleDateString();
+  } catch {
+    return String(d);
+  }
+}
+
+/* -------------------------
+   UI constants & helpers
+   ------------------------- */
 const NAV_ITEMS = [
   { key: "Overview", Icon: BarChart2 },
   { key: "Instructors", Icon: UserPlus },
   { key: "Courses", Icon: BookOpen },
   { key: "Enrollments", Icon: Users },
   { key: "Attendance", Icon: CalendarCheck },
-  { key: "Assignments", Icon: FileText },
+  { key: "Students", Icon: Users },
   { key: "Payments", Icon: DollarSign },
   { key: "Certificates", Icon: Award },
-  { key: "Users", Icon: Users },
   { key: "Settings", Icon: Settings },
 ];
 
@@ -92,8 +150,7 @@ function StatCard({ title, value, subtitle, icon: Icon, theme = "blue" }) {
   );
 }
 
-function Card({ children, className = "", theme = "blue" }) {
-  const cls = colorClasses(theme);
+function Card({ children, className = "" }) {
   return (
     <motion.div whileHover={{ scale: 1.01 }} className={`bg-white/95 backdrop-blur-sm ring-1 ring-gray-100 rounded-2xl p-6 shadow-lg ${className}`}>
       {children}
@@ -101,84 +158,112 @@ function Card({ children, className = "", theme = "blue" }) {
   );
 }
 
+/* -------------------------
+   Minimal InstructorForm component
+   ------------------------- */
 function InstructorForm({ initial = null, onSave, onCancel }) {
-  const [form, setForm] = useState({ name: "", email: "", password: "", bio: "", image: "" });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    bio: "",
+    image: "",
+  });
 
   useEffect(() => {
     if (initial) {
-      setForm({ name: initial.name || "", email: initial.email || "", password: "", bio: initial.bio || "", image: initial.image || "" });
-    } else {
-      setForm({ name: "", email: "", password: "", bio: "", image: "" });
+      setForm({
+        name: initial.name || "",
+        email: initial.email || "",
+        bio: initial.bio || "",
+        image: initial.image || "",
+      });
     }
   }, [initial]);
 
   const handleChange = (e) => setForm((s) => ({ ...s, [e.target.name]: e.target.value }));
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    await onSave(form);
+    if (!form.name || !form.email) {
+      alert("Name and email required");
+      return;
+    }
+    onSave && onSave(form);
   };
 
   return (
     <Card>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">{initial ? "Edit Instructor" : "Add Instructor"}</h3>
-        {initial && (
-          <button onClick={onCancel} className="text-sm text-gray-500">Cancel</button>
-        )}
-      </div>
-
+      <h3 className="text-lg font-semibold mb-3">{initial ? "Edit Instructor" : "Add Instructor"}</h3>
       <form onSubmit={handleSubmit} className="space-y-3">
-        <input name="name" value={form.name} onChange={handleChange} placeholder="Full name" required className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
-        <input name="email" type="email" value={form.email} onChange={handleChange} placeholder="Email" required className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
-        <input name="password" type="password" value={form.password} onChange={handleChange} placeholder={initial ? "Leave blank to keep password" : "Password"} className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
-        <input name="image" value={form.image} onChange={handleChange} placeholder="Image URL" className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
-        <textarea name="bio" value={form.bio} onChange={handleChange} rows="3" placeholder="Short bio" className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
+        <div>
+          <label className="block text-xs text-gray-600">Name</label>
+          <input name="name" value={form.name} onChange={handleChange} className="w-full px-3 py-2 border rounded" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-600">Email</label>
+          <input name="email" value={form.email} onChange={handleChange} className="w-full px-3 py-2 border rounded" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-600">Bio</label>
+          <textarea name="bio" value={form.bio} onChange={handleChange} className="w-full px-3 py-2 border rounded" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-600">Image URL</label>
+          <input name="image" value={form.image} onChange={handleChange} className="w-full px-3 py-2 border rounded" />
+        </div>
+
         <div className="flex gap-2">
-          <button type="submit" className="px-4 py-2 bg-blue-700 text-white rounded-lg">{initial ? "Save" : "Add Instructor"}</button>
-          <button type="button" onClick={() => setForm({ name: "", email: "", password: "", bio: "", image: "" })} className="px-4 py-2 border rounded-lg">Clear</button>
+          <button type="submit" className="px-3 py-1 bg-blue-700 text-white rounded">Save</button>
+          <button type="button" onClick={onCancel} className="px-3 py-1 bg-gray-200 rounded">Cancel</button>
         </div>
       </form>
     </Card>
   );
 }
 
-function CertificateGenerator({ users, courses, onGenerate }) {
-  const [form, setForm] = useState({ userId: "", courseId: "", grade: "" });
+/* -------------------------
+   Minimal CertificateGenerator component
+   ------------------------- */
+function CertificateGenerator({ users = [], courses = [], onGenerate }) {
+  const [userId, setUserId] = useState("");
+  const [courseId, setCourseId] = useState("");
+  const [grade, setGrade] = useState("");
 
-  const handleChange = (e) => setForm((s) => ({ ...s, [e.target.name]: e.target.value }));
-
-  const submit = (e) => {
-    e.preventDefault();
-    onGenerate(form);
-    setForm({ userId: "", courseId: "", grade: "" });
+  const handleGenerate = () => {
+    if (!userId || !courseId) {
+      alert("Select user and course");
+      return;
+    }
+    onGenerate && onGenerate({ userId, courseId, grade });
+    setGrade("");
+    setUserId("");
+    setCourseId("");
   };
 
   return (
-    <Card>
-      <h3 className="text-lg font-semibold mb-3">Generate Certificate</h3>
-      <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <select name="userId" required value={form.userId} onChange={handleChange} className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200">
-          <option value="">Select student</option>
-          {users.map((u) => (
-            <option key={u._id ?? `${u.email ?? u.id}`} value={u._id}>{u.name || u.email}</option>
-          ))}
+    <div>
+      <h4 className="font-semibold mb-2">Generate Certificate</h4>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <select value={userId} onChange={(e) => setUserId(e.target.value)} className="px-3 py-2 border rounded">
+          <option value="">Select user</option>
+          {users.map((u) => <option key={u._id ?? u.id ?? u.email} value={u._id ?? u.id ?? u.email}>{u.name || u.email}</option>)}
         </select>
-        <select name="courseId" required value={form.courseId} onChange={handleChange} className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200">
+        <select value={courseId} onChange={(e) => setCourseId(e.target.value)} className="px-3 py-2 border rounded">
           <option value="">Select course</option>
-          {courses.map((c) => (
-            <option key={c._id ?? `${c.title ?? c.id}`} value={c._id}>{c.title}</option>
-          ))}
+          {courses.map((c) => <option key={c._id ?? c.id} value={c._id ?? c.id}>{c.title}</option>)}
         </select>
-        <input name="grade" placeholder="Grade (optional)" value={form.grade} onChange={handleChange} className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
-        <div className="sm:col-span-3">
-          <button type="submit" className="px-4 py-2 bg-blue-700 text-white rounded-lg">Generate Certificate</button>
-        </div>
-      </form>
-    </Card>
+        <input placeholder="Grade (optional)" value={grade} onChange={(e) => setGrade(e.target.value)} className="px-3 py-2 border rounded" />
+      </div>
+      <div className="mt-3">
+        <button onClick={handleGenerate} className="px-3 py-1 bg-green-600 text-white rounded">Generate</button>
+      </div>
+    </div>
   );
 }
 
+/* -------------------------
+   Main admin dashboard component
+   ------------------------- */
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("Overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -198,64 +283,17 @@ export default function AdminDashboard() {
   const [editingInstructor, setEditingInstructor] = useState(null);
   const [processingIds, setProcessingIds] = useState([]); // track ids for button disabling
 
+  // Students tab state
+  const [selectedStudents, setSelectedStudents] = useState(new Set());
+  const [selectAllStudents, setSelectAllStudents] = useState(false);
+  const [studentModal, setStudentModal] = useState(null);
+
   const navigate = useNavigate();
+  const pollRef = useRef(null);
 
-  // --- helpers ---
-  const formatDate = (d) => {
-    if (!d) return "—";
-    try {
-      return new Date(d).toLocaleDateString();
-    } catch {
-      return String(d);
-    }
-  };
-
-  const pick = (obj, paths = []) => {
-    if (!obj) return undefined;
-    for (const p of paths) {
-      const parts = p.split(".");
-      let cur = obj;
-      let ok = true;
-      for (const part of parts) {
-        if (cur == null) { ok = false; break; }
-        const cleanPart = part.replace(/\?$/, "");
-        cur = cur[cleanPart];
-      }
-      if (ok && cur !== undefined && cur !== null) return cur;
-    }
-    return undefined;
-  };
-
-  const normalizeList = (data) => {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-
-    // common shapes
-    const candidates = [
-      data.enrollments,
-      data.results,
-      data.data,
-      data.rows,
-      data.items,
-      data.documents,
-      data.records,
-      data.list,
-    ];
-
-    for (const c of candidates) {
-      if (Array.isArray(c)) return c;
-    }
-
-    if (data.data && typeof data.data === 'object') {
-      const nested = normalizeList(data.data);
-      if (nested.length) return nested;
-    }
-
-    if (typeof data === 'object') return [data];
-
-    return [];
-  };
-
+  /* -------------------------
+     Fetch helpers
+     ------------------------- */
   const fetchAllEnrollments = useCallback(async () => {
     try {
       const tryUrls = [
@@ -270,51 +308,44 @@ export default function AdminDashboard() {
           const res = await axios.get(url);
           const d = res.data ?? res;
           const list = normalizeList(d);
-          if (list.length) { setEnrollments(list); return list; }
-        } catch (e) {
+          if (list.length) {
+            setEnrollments(list);
+            return list;
+          }
+        } catch {
           // ignore and try next
         }
       }
 
+      // fallback: paginated fetch
       const accumulated = [];
       let page = 1;
       const pageSize = 200;
       for (let i = 0; i < 25; i++) {
         try {
-          const res = await axios.get(`/admin/enrollments?page=${page}&limit=${pageSize}`).catch(() => axios.get(`/enrollments?page=${page}&limit=${pageSize}`));
+          const res = await axios
+            .get(`/admin/enrollments?page=${page}&limit=${pageSize}`)
+            .catch(() => axios.get(`/enrollments?page=${page}&limit=${pageSize}`));
           const d = res.data ?? res;
           const list = normalizeList(d);
           if (!list || list.length === 0) break;
           accumulated.push(...list);
           if (list.length < pageSize) break;
           page += 1;
-        } catch (e) { break; }
+        } catch {
+          break;
+        }
       }
 
       if (accumulated.length) {
         setEnrollments(accumulated);
         return accumulated;
       }
-
     } catch (e) {
-      console.warn('fetchAllEnrollments failed', e);
+      console.warn("fetchAllEnrollments failed", e);
     }
     return [];
   }, []);
-
-  useEffect(() => {
-    let mounted = true;
-    const run = async () => {
-      if (!mounted) return;
-      await fetchAllData();
-    };
-    run();
-    return () => { mounted = false; };
-  }, []);
-
-  useEffect(() => {
-    setSidebarOpen(false);
-  }, [activeTab]);
 
   async function fetchResource(primary, fallback, defaultValue) {
     try {
@@ -337,7 +368,17 @@ export default function AdminDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const [overviewData, instructorsData, coursesData, enrollmentsData, attendanceData, assignmentsData, paymentsData, certificatesData, usersData] = await Promise.all([
+      const [
+        overviewData,
+        instructorsData,
+        coursesData,
+        enrollmentsData,
+        attendanceData,
+        assignmentsData,
+        paymentsData,
+        certificatesData,
+        usersData,
+      ] = await Promise.all([
         fetchResource("/admin/overview", null, {}),
         fetchResource("/admin/instructors", "/instructors", []),
         fetchResource("/admin/courses", "/courses", []),
@@ -382,6 +423,50 @@ export default function AdminDashboard() {
     }
   }, [fetchAllEnrollments]);
 
+  /* -------------------------
+     Effects
+     ------------------------- */
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      if (!mounted) return;
+      await fetchAllData();
+    };
+    run();
+    return () => {
+      mounted = false;
+    };
+  }, [fetchAllData]);
+
+  // close sidebar on tab change
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [activeTab]);
+
+  // poll for "real-time" while on Overview
+  useEffect(() => {
+    if (activeTab === "Overview") {
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(() => {
+        fetchAllData().catch(() => {});
+      }, 10000);
+    } else {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    }
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [activeTab, fetchAllData]);
+
+  /* -------------------------
+     Actions (CRUD and helpers)
+     ------------------------- */
   const handleLogout = useCallback(() => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -392,161 +477,256 @@ export default function AdminDashboard() {
   const removeProcessing = (id) => setProcessingIds((s) => s.filter((x) => x !== id));
   const isProcessing = (id) => processingIds.includes(id);
 
-  const saveInstructor = useCallback(async (form) => {
-    try {
-      if (editingInstructor && editingInstructor._id) {
-        await axios.put(`/admin/instructors/${editingInstructor._id}`, form).catch(() => axios.put(`/instructors/${editingInstructor._id}`, form));
-        setEditingInstructor(null);
-      } else {
-        await axios.post("/admin/instructors", form).catch(() => axios.post("/instructors", form));
+  const saveInstructor = useCallback(
+    async (form) => {
+      try {
+        if (editingInstructor && editingInstructor._id) {
+          await axios.put(`/admin/instructors/${editingInstructor._id}`, form).catch(() => axios.put(`/instructors/${editingInstructor._id}`, form));
+          setEditingInstructor(null);
+        } else {
+          await axios.post("/admin/instructors", form).catch(() => axios.post("/instructors", form));
+        }
+        await fetchAllData();
+        setActiveTab("Instructors");
+      } catch (err) {
+        alert(err.response?.data?.message || "Error saving instructor");
       }
-      await fetchAllData();
-      setActiveTab("Instructors");
-    } catch (err) {
-      alert(err.response?.data?.message || "Error saving instructor");
-    }
-  }, [editingInstructor, fetchAllData]);
+    },
+    [editingInstructor, fetchAllData]
+  );
 
   const editInstructor = useCallback((inst) => {
     setEditingInstructor(inst);
     setActiveTab("Instructors");
   }, []);
 
-  const deleteInstructor = useCallback(async (id) => {
-    if (!confirm("Delete this instructor? This will not automatically delete their courses.")) return;
-    addProcessing(id);
-    try {
-      await axios.delete(`/admin/instructors/${id}`).catch(() => axios.delete(`/instructors/${id}`));
-      await fetchAllData();
-    } catch (err) {
-      alert("Failed to delete instructor");
-    } finally {
-      removeProcessing(id);
-    }
-  }, [fetchAllData]);
+  const deleteInstructor = useCallback(
+    async (id) => {
+      if (!confirm("Delete this instructor? This will not automatically delete their courses.")) return;
+      addProcessing(id);
+      try {
+        await axios.delete(`/admin/instructors/${id}`).catch(() => axios.delete(`/instructors/${id}`));
+        await fetchAllData();
+      } catch (err) {
+        alert("Failed to delete instructor");
+      } finally {
+        removeProcessing(id);
+      }
+    },
+    [fetchAllData]
+  );
 
-  const unenrollStudent = useCallback(async (enrollmentId) => {
-    if (!confirm("Unenroll this student?")) return;
-    addProcessing(enrollmentId);
-    try {
-      await axios.delete(`/admin/enrollments/${enrollmentId}`).catch(() => axios.delete(`/enrollments/${enrollmentId}`));
-      await fetchAllData();
-    } catch (err) {
-      alert("Failed to unenroll student");
-    } finally {
-      removeProcessing(enrollmentId);
-    }
-  }, [fetchAllData]);
+  const unenrollStudent = useCallback(
+    async (enrollmentId) => {
+      if (!confirm("Unenroll this student?")) return;
+      addProcessing(enrollmentId);
+      try {
+        await axios.delete(`/admin/enrollments/${enrollmentId}`).catch(() => axios.delete(`/enrollments/${enrollmentId}`));
+        await fetchAllData();
+      } catch (err) {
+        alert("Failed to unenroll student");
+      } finally {
+        removeProcessing(enrollmentId);
+      }
+    },
+    [fetchAllData]
+  );
 
-  const markAttendance = useCallback(async (courseId, date, studentId, present = true) => {
-    const key = `${courseId}-${studentId}-${date}`;
-    addProcessing(key);
-    try {
-      await axios.post("/instructor/attendance", { courseId, date, studentId, present }).catch(() => axios.post("/admin/attendance", { courseId, date, studentId, present }));
-      await fetchAllData();
-    } catch (err) {
-      alert("Failed to mark attendance");
-    } finally {
-      removeProcessing(key);
-    }
-  }, [fetchAllData]);
+  const markAttendance = useCallback(
+    async (courseId, date, studentId, present = true) => {
+      const key = `${courseId}-${studentId}-${date}`;
+      addProcessing(key);
+      try {
+        await axios.post("/instructor/attendance", { courseId, date, studentId, present }).catch(() => axios.post("/admin/attendance", { courseId, date, studentId, present }));
+        await fetchAllData();
+      } catch (err) {
+        alert("Failed to mark attendance");
+      } finally {
+        removeProcessing(key);
+      }
+    },
+    [fetchAllData]
+  );
 
-  const gradeSubmission = useCallback(async (submissionId, grade) => {
-    addProcessing(submissionId);
-    try {
-      await axios.post(`/admin/assignments/${submissionId}/grade`, { grade });
-      await fetchAllData();
-    } catch (err) {
-      alert("Failed to grade");
-    } finally {
-      removeProcessing(submissionId);
-    }
-  }, [fetchAllData]);
+  const gradeSubmission = useCallback(
+    async (submissionId, grade) => {
+      addProcessing(submissionId);
+      try {
+        await axios.post(`/admin/assignments/${submissionId}/grade`, { grade });
+        await fetchAllData();
+      } catch (err) {
+        alert("Failed to grade");
+      } finally {
+        removeProcessing(submissionId);
+      }
+    },
+    [fetchAllData]
+  );
 
-  const approvePayout = useCallback(async (paymentId) => {
-    if (!confirm("Approve payout to instructor?")) return;
-    addProcessing(paymentId);
-    try {
-      await axios.post(`/admin/payments/${paymentId}/approve`);
-      await fetchAllData();
-    } catch (err) {
-      alert("Failed to approve payout");
-    } finally {
-      removeProcessing(paymentId);
-    }
-  }, [fetchAllData]);
+  const approvePayout = useCallback(
+    async (paymentId) => {
+      if (!confirm("Approve payout to instructor?")) return;
+      addProcessing(paymentId);
+      try {
+        await axios.post(`/admin/payments/${paymentId}/approve`);
+        await fetchAllData();
+      } catch (err) {
+        alert("Failed to approve payout");
+      } finally {
+        removeProcessing(paymentId);
+      }
+    },
+    [fetchAllData]
+  );
 
-  const refundPayment = useCallback(async (paymentId) => {
-    if (!confirm("Refund this payment?")) return;
-    addProcessing(paymentId);
-    try {
-      await axios.post(`/admin/payments/${paymentId}/refund`).catch(() => axios.post(`/payments/${paymentId}/refund`));
-      await fetchAllData();
-    } catch (err) {
-      alert("Failed to refund");
-    } finally {
-      removeProcessing(paymentId);
-    }
-  }, [fetchAllData]);
+  const refundPayment = useCallback(
+    async (paymentId) => {
+      if (!confirm("Refund this payment?")) return;
+      addProcessing(paymentId);
+      try {
+        await axios.post(`/admin/payments/${paymentId}/refund`).catch(() => axios.post(`/payments/${paymentId}/refund`));
+        await fetchAllData();
+      } catch (err) {
+        alert("Failed to refund");
+      } finally {
+        removeProcessing(paymentId);
+      }
+    },
+    [fetchAllData]
+  );
 
-  const generateCertificate = useCallback(async ({ userId, courseId, grade }) => {
-    if (!userId || !courseId) {
-      alert("student and course required");
-      return;
-    }
-    try {
-      await axios.post("/admin/certificates/generate", { userId, courseId, grade }).catch(() => axios.post("/certificates/generate", { userId, courseId, grade }));
-      await fetchAllData();
-      alert("Certificate generation requested.");
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to generate certificate");
-    }
-  }, [fetchAllData]);
+  const generateCertificate = useCallback(
+    async ({ userId, courseId, grade }) => {
+      if (!userId || !courseId) {
+        alert("student and course required");
+        return;
+      }
+      try {
+        await axios.post("/admin/certificates/generate", { userId, courseId, grade }).catch(() => axios.post("/certificates/generate", { userId, courseId, grade }));
+        await fetchAllData();
+        alert("Certificate generation requested.");
+      } catch (err) {
+        alert(err.response?.data?.message || "Failed to generate certificate");
+      }
+    },
+    [fetchAllData]
+  );
 
-  const revokeCertificate = useCallback(async (certId) => {
-    if (!confirm("Revoke this certificate?")) return;
-    addProcessing(certId);
-    try {
-      await axios.delete(`/admin/certificates/${certId}`).catch(() => axios.delete(`/certificates/${certId}`));
-      await fetchAllData();
-    } catch (err) {
-      alert("Failed to revoke certificate");
-    } finally {
-      removeProcessing(certId);
-    }
-  }, [fetchAllData]);
+  const revokeCertificate = useCallback(
+    async (certId) => {
+      if (!confirm("Revoke this certificate?")) return;
+      addProcessing(certId);
+      try {
+        await axios.delete(`/admin/certificates/${certId}`).catch(() => axios.delete(`/certificates/${certId}`));
+        await fetchAllData();
+      } catch (err) {
+        alert("Failed to revoke certificate");
+      } finally {
+        removeProcessing(certId);
+      }
+    },
+    [fetchAllData]
+  );
 
-  const updateUserRole = useCallback(async (id, role) => {
-    addProcessing(id);
-    try {
-      await axios.put(`/admin/users/${id}`, { role }).catch(() => axios.put(`/users/${id}`, { role }));
-      await fetchAllData();
-    } catch (err) {
-      alert("Failed to update user role");
-    } finally {
-      removeProcessing(id);
-    }
-  }, [fetchAllData]);
+  const updateUserRole = useCallback(
+    async (id, role) => {
+      addProcessing(id);
+      try {
+        await axios.put(`/admin/users/${id}`, { role }).catch(() => axios.put(`/users/${id}`, { role }));
+        await fetchAllData();
+      } catch (err) {
+        alert("Failed to update user role");
+      } finally {
+        removeProcessing(id);
+      }
+    },
+    [fetchAllData]
+  );
 
-  const deleteUser = useCallback(async (id) => {
-    if (!confirm("Delete this user?")) return;
-    addProcessing(id);
-    try {
-      await axios.delete(`/admin/users/${id}`).catch(() => axios.delete(`/users/${id}`));
-      await fetchAllData();
-    } catch (err) {
-      alert("Failed to delete user");
-    } finally {
-      removeProcessing(id);
-    }
-  }, [fetchAllData]);
+  const deleteUser = useCallback(
+    async (id) => {
+      if (!confirm("Delete this user?")) return;
+      addProcessing(id);
+      try {
+        await axios.delete(`/admin/users/${id}`).catch(() => axios.delete(`/users/${id}`));
+        await fetchAllData();
+      } catch (err) {
+        alert("Failed to delete user");
+      } finally {
+        removeProcessing(id);
+      }
+    },
+    [fetchAllData]
+  );
 
-  // --- analytics helpers for per-tab involvement ---
-  const formatMonth = (d) => {
-    const dt = new Date(d);
-    return dt.toLocaleString(undefined, { month: 'short', year: 'numeric' });
+  // bulk student actions
+  const toggleSelectStudent = (id) => {
+    setSelectedStudents((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      setSelectAllStudents(false);
+      return next;
+    });
   };
 
+  const toggleSelectAll = (list) => {
+    if (!selectAllStudents) {
+      const all = new Set(list.map((u) => u._id ?? u.id ?? u.email));
+      setSelectedStudents(all);
+      setSelectAllStudents(true);
+    } else {
+      setSelectedStudents(new Set());
+      setSelectAllStudents(false);
+    }
+  };
+
+  const exportSelectedAsCSV = () => {
+    const rows = [];
+    const ids = Array.from(selectedStudents);
+    const subset = users.filter((u) => ids.includes(u._id ?? u.id ?? u.email));
+    if (subset.length === 0) {
+      alert("No students selected for export");
+      return;
+    }
+
+    const header = ["id", "name", "email", "role"];
+    rows.push(header.join(","));
+    subset.forEach((u) => {
+      rows.push([u._id ?? u.id ?? "", (u.name || "").replace(/,/g, ""), (u.email || "").replace(/,/g, ""), (u.role || "student")].join(","));
+    });
+
+    const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `students_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const bulkDeleteSelected = async () => {
+    if (!confirm(`Delete ${selectedStudents.size} selected user(s)? This action cannot be undone.`)) return;
+    const ids = Array.from(selectedStudents);
+    for (const id of ids) {
+      addProcessing(id);
+      try {
+        await axios.delete(`/admin/users/${id}`).catch(() => axios.delete(`/users/${id}`));
+      } catch (err) {
+        console.warn("failed deleting", id, err);
+      } finally {
+        removeProcessing(id);
+      }
+    }
+    setSelectedStudents(new Set());
+    await fetchAllData();
+  };
+
+  /* -------------------------
+     Analytics helpers & chart
+     ------------------------- */
   const getLastNMonths = (n = 6) => {
     const res = [];
     const now = new Date();
@@ -557,10 +737,9 @@ export default function AdminDashboard() {
     return res;
   };
 
-  // compute involvement counts per tab for the last `months` months
   const computeInvolvement = ({ months = 6 } = {}) => {
     const buckets = getLastNMonths(months).map((d) => ({
-      monthLabel: formatMonth(d),
+      monthLabel: d.toLocaleString(undefined, { month: "short", year: "numeric" }),
       instructors: 0,
       courses: 0,
       enrollments: 0,
@@ -575,11 +754,10 @@ export default function AdminDashboard() {
       if (!dateStr) return null;
       const d = new Date(dateStr);
       if (isNaN(d)) return null;
-      const label = formatMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+      const label = new Date(d.getFullYear(), d.getMonth(), 1).toLocaleString(undefined, { month: "short", year: "numeric" });
       return buckets.find((b) => b.monthLabel === label) ?? null;
     };
 
-    // helpers to increment by list and date fields
     const bump = (list, datePaths, key) => {
       (list || []).forEach((item) => {
         const date = pick(item, datePaths) || item.createdAt || item.created_at || item.date || item.publishedAt || item.paidAt;
@@ -588,39 +766,47 @@ export default function AdminDashboard() {
       });
     };
 
-    bump(instructors, ["createdAt", "created_at", "date"], 'instructors');
-    bump(courses, ["createdAt", "created_at", "publishedAt", "date"], 'courses');
-    bump(enrollments, ["createdAt", "enrolledAt", "created_at", "date"], 'enrollments');
-    bump(attendance, ["date", "createdAt", "created_at"], 'attendance');
-    bump(assignments, ["createdAt", "created_at", "dueDate", "due_date"], 'assignments');
-    // payments: count transactions
+    bump(instructors, ["createdAt", "created_at", "date"], "instructors");
+    bump(courses, ["createdAt", "created_at", "publishedAt", "date"], "courses");
+    bump(enrollments, ["createdAt", "enrolledAt", "created_at", "date"], "enrollments");
+    bump(attendance, ["date", "createdAt", "created_at"], "attendance");
+    bump(assignments, ["createdAt", "created_at", "dueDate", "due_date"], "assignments");
     (payments || []).forEach((p) => {
       const date = pick(p, ["createdAt", "date", "paidAt", "created_at"]) || p.date;
       const b = findBucket(date);
       if (b) b.payments += 1;
     });
-    bump(certificates, ["issuedAt", "createdAt", "created_at"], 'certificates');
-    bump(users, ["createdAt", "created_at", "registeredAt", "date"], 'users');
+    bump(certificates, ["issuedAt", "createdAt", "created_at"], "certificates");
+    bump(users, ["createdAt", "created_at", "registeredAt", "date"], "users");
 
     return buckets;
   };
 
   const MultiSeriesChart = ({ months = 6 }) => {
-    const data = useMemo(() => computeInvolvement({ months }), [enrollments, instructors, courses, attendance, assignments, payments, certificates, users, months]);
+    const data = useMemo(() => computeInvolvement({ months }), [
+      enrollments,
+      instructors,
+      courses,
+      attendance,
+      assignments,
+      payments,
+      certificates,
+      users,
+      months,
+    ]);
 
-    // list of series to draw (ordered)
     const series = [
-      { key: 'enrollments', name: 'Enrollments' },
-      { key: 'users', name: 'Users' },
-      { key: 'instructors', name: 'Instructors' },
-      { key: 'courses', name: 'Courses' },
-      { key: 'attendance', name: 'Attendance' },
-      { key: 'assignments', name: 'Assignments' },
-      { key: 'payments', name: 'Payments' },
-      { key: 'certificates', name: 'Certificates' },
+      { key: "enrollments", name: "Enrollments" },
+      { key: "users", name: "Users" },
+      { key: "instructors", name: "Instructors" },
+      { key: "courses", name: "Courses" },
+      { key: "attendance", name: "Attendance" },
+      { key: "assignments", name: "Assignments" },
+      { key: "payments", name: "Payments" },
+      { key: "certificates", name: "Certificates" },
     ];
 
-    const strokes = ['#2563eb', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#7c3aed', '#e11d48'];
+    const strokes = ["#2563eb", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444", "#06b6d4", "#7c3aed", "#e11d48"];
 
     return (
       <Card className="w-full">
@@ -647,6 +833,9 @@ export default function AdminDashboard() {
     );
   };
 
+  /* -------------------------
+     UI Subcomponents (Sidebar + Tabs)
+     ------------------------- */
   const Sidebar = () => (
     <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-gradient-to-b from-blue-900 to-blue-800 text-white transform transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
       <div className="flex items-center justify-between px-6 py-5 border-b border-blue-700">
@@ -674,23 +863,49 @@ export default function AdminDashboard() {
     </aside>
   );
 
+  // Overview: always use live computed counts (users + enrollments)
   const OverviewTab = () => {
     const preview = (items) => (Array.isArray(items) ? items.slice(0, 3) : []);
 
-    const totalLearners = overview.totalUsers ?? overview.users ?? users.length;
+    // live counts
+    const registeredUsersCount = users.length;
+
+    const uniqueLearnersFromEnrollments = useMemo(() => {
+      const s = new Set();
+      (enrollments || []).forEach((e) => {
+        const sid =
+          e.studentId ??
+          pick(e, ["student._id", "student.id", "userId", "user._id"]) ??
+          e.studentEmail ??
+          pick(e, ["student.email", "user.email"]);
+        if (sid) s.add(String(sid));
+      });
+      return s.size;
+    }, [enrollments]);
+
+    // computed live count (best-effort)
+    const computedCount = Math.max(uniqueLearnersFromEnrollments, registeredUsersCount, 0);
 
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold">Overview</h2>
-          <div className="flex gap-2">
+          <h2 className="text-2xl font-semibold">Overview (Real-time)</h2>
+          <div className="flex gap-2 items-center">
             <button onClick={fetchAllData} className="px-3 py-1 bg-gray-200 rounded text-sm">Refresh</button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <StatCard title="Total Learners" value={totalLearners} icon={Users} theme="teal" />
-          <StatCard title="Instructors" value={overview.totalInstructors ?? instructors.length} icon={UserPlus} theme="purple" />
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+          <StatCard
+            title="Total learners"
+            value={computedCount}
+            subtitle={"Live computed (users & enrollments)"}
+            icon={Users}
+            theme="blue"
+          />
+
+          <StatCard title="Registered users (real-time)" value={registeredUsersCount} subtitle="From users API" icon={Users} theme="teal" />
+          <StatCard title="Unique enrolled learners" value={uniqueLearnersFromEnrollments} subtitle="Counted from enrollments" icon={UserPlus} theme="purple" />
           <StatCard title="Courses" value={overview.totalCourses ?? courses.length} icon={BookOpen} theme="amber" />
         </div>
 
@@ -760,54 +975,112 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Multi-series analytics chart placed at the BOTTOM of the Overview tab */}
         <MultiSeriesChart months={6} />
       </div>
     );
   };
 
-  const InstructorsTab = () => (
-    <section className="grid md:grid-cols-2 gap-6">
-      <div>
-        <InstructorForm initial={editingInstructor} onSave={saveInstructor} onCancel={() => setEditingInstructor(null)} />
-      </div>
+  /* -------------------------
+     Students tab
+     ------------------------- */
+  const StudentsTab = () => {
+    const [query, setQuery] = useState("");
 
-      <div>
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Instructors ({instructors.length})</h3>
-            <div className="text-sm text-gray-500">Manage instructors</div>
+    const students = useMemo(
+      () =>
+        (users || []).filter((u) => {
+          const role = (u.role || "").toString().toLowerCase();
+          return !role || role === "student";
+        }),
+      [users]
+    );
+
+    const filtered = students.filter((u) => {
+      const q = query.trim().toLowerCase();
+      if (!q) return true;
+      return (u.name && u.name.toLowerCase().includes(q)) || (u.email && u.email.toLowerCase().includes(q));
+    });
+
+    useEffect(() => {
+      if (selectAllStudents) {
+        const allIds = new Set(students.map((u) => u._id ?? u.id ?? u.email));
+        setSelectedStudents(allIds);
+      }
+    }, [students, selectAllStudents]);
+
+    return (
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Students ({students.length})</h3>
+          <div className="flex items-center gap-2">
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search students" className="px-3 py-1 border rounded-lg text-sm" />
+            <button onClick={() => { setQuery(""); fetchAllData(); }} className="px-3 py-1 bg-gray-200 rounded text-sm">Refresh</button>
           </div>
+        </div>
 
-          {instructors.length === 0 ? (
-            <p className="text-gray-500">No instructors yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {instructors.map((inst, idx) => (
-                <div key={inst._id ?? `inst-${idx}`} className="flex items-center gap-4 border rounded-lg p-3">
-                  <img src={inst.image || "https://cdn-icons-png.flaticon.com/512/194/194938.png"} alt={inst.name} className="w-12 h-12 rounded-full object-cover" />
+        <div className="flex items-center gap-3 mb-3">
+          <label className="inline-flex items-center gap-2">
+            <input type="checkbox" checked={selectAllStudents} onChange={() => toggleSelectAll(students)} />
+            <span className="text-sm">Select all</span>
+          </label>
+
+          <div className="ml-auto flex gap-2">
+            <button onClick={exportSelectedAsCSV} className="px-3 py-1 bg-blue-700 text-white rounded text-sm">Export CSV</button>
+            <button onClick={bulkDeleteSelected} disabled={selectedStudents.size === 0} className="px-3 py-1 bg-red-600 text-white rounded text-sm">Delete Selected</button>
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <p className="text-gray-500">No students found.</p>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map((u, idx) => {
+              const id = u._id ?? u.id ?? `stu-${idx}`;
+
+              const enrollCount = (enrollments || []).filter((e) => {
+                const sid = pick(e, ["studentId", "student._id", "student.id", "userId", "user._id", "studentEmail", "userEmail"]);
+                const matchKey = u._id || u.id || u.email;
+                if (!sid) return false;
+                return String(sid) === String(matchKey) || String(sid) === String(u.email);
+              }).length;
+
+              const checked = selectedStudents.has(u._id ?? u.id ?? u.email);
+
+              return (
+                <div key={id} className="flex items-center gap-4 border rounded-lg p-3">
+                  <label className="inline-flex items-center">
+                    <input type="checkbox" checked={checked} onChange={() => toggleSelectStudent(u._id ?? u.id ?? u.email)} />
+                  </label>
+
+                  <img src={u.image || "https://cdn-icons-png.flaticon.com/512/194/194938.png"} alt={u.name || u.email} className="w-12 h-12 rounded-full object-cover" />
                   <div className="flex-1">
-                    <div className="font-medium">{inst.name}</div>
-                    <div className="text-xs text-gray-500">{inst.email}</div>
-                    <div className="text-xs text-gray-400 line-clamp-2">{inst.bio}</div>
+                    <div className="font-medium">{u.name || u.email}</div>
+                    <div className="text-xs text-gray-500">{u.email}</div>
+                    <div className="text-xs text-gray-400">Enrolled in {enrollCount} course{enrollCount !== 1 ? "s" : ""}</div>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => editInstructor(inst)} className="px-2 py-2 bg-gray-100 rounded hover:bg-gray-200" title="Edit">
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button disabled={isProcessing(inst._id)} onClick={() => deleteInstructor(inst._id)} className="px-2 py-2 bg-red-600 text-white rounded hover:bg-red-500" title="Delete">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setStudentModal(u)} className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm">View</button>
+                    <select value={u.role || "student"} onChange={(e) => updateUserRole(u._id, e.target.value)} className="px-2 py-1 border rounded-lg">
+                      <option value="student">Student</option>
+                      <option value="instructor">Instructor</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    <button disabled={isProcessing(u._id)} onClick={() => deleteUser(u._id)} className="px-2 py-2 bg-red-600 text-white rounded-lg"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
-    </section>
-  );
+              );
+            })}
+          </div>
+        )}
 
+        <StudentDetailsModal student={studentModal} onClose={() => setStudentModal(null)} enrollments={enrollments} />
+      </Card>
+    );
+  };
+
+  /* -------------------------
+     Other tabs (Courses, Enrollments, Attendance, Payments, Certificates, Settings)
+     ------------------------- */
   const CoursesTab = () => (
     <Card>
       <div className="flex items-center justify-between mb-4">
@@ -890,9 +1163,9 @@ export default function AdminDashboard() {
                 let paymentStatus = "Unknown";
                 if (paymentStatusRaw) {
                   const ps = String(paymentStatusRaw).toLowerCase();
-                  if (["paid", "completed", "success"].some(s => ps.includes(s))) paymentStatus = "Paid";
-                  else if (["pending", "unpaid", "processing"].some(s => ps.includes(s))) paymentStatus = "Pending";
-                  else if (["refunded", "failed", "cancelled", "canceled"].some(s => ps.includes(s))) paymentStatus = "Refunded/Failed";
+                  if (["paid", "completed", "success"].some((s) => ps.includes(s))) paymentStatus = "Paid";
+                  else if (["pending", "unpaid", "processing"].some((s) => ps.includes(s))) paymentStatus = "Pending";
+                  else if (["refunded", "failed", "cancelled", "canceled"].some((s) => ps.includes(s))) paymentStatus = "Refunded/Failed";
                   else paymentStatus = String(paymentStatusRaw);
                 } else {
                   const paidFlag = pick(en, ["paid", "isPaid", "payment?.paid"]);
@@ -953,7 +1226,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between mb-2">
               <div>
                 <div className="font-medium">{a.courseTitle || a.course?.title}</div>
-                <div className="text-xs text-gray-500">{new Date(a.date).toLocaleDateString()}</div>
+                <div className="text-xs text-gray-500">{formatDate(a.date)}</div>
               </div>
               <div className="text-sm text-gray-500">Marked by {a.markedBy || a.teacherName}</div>
             </div>
@@ -973,29 +1246,6 @@ export default function AdminDashboard() {
         ))
       )}
     </div>
-  );
-
-  const AssignmentsTab = () => (
-    <Card>
-      <h3 className="text-lg font-semibold mb-4">Assignments ({assignments.length})</h3>
-      {assignments.length === 0 ? (
-        <p className="text-gray-500">No assignments yet.</p>
-      ) : (
-        <div className="space-y-3">
-          {assignments.map((asg) => (
-            <div key={asg._id ?? `${asg.title ?? Math.random()}`} className="border p-3 rounded-lg flex items-start justify-between bg-white">
-              <div>
-                <div className="font-medium">{asg.title}</div>
-                <div className="text-xs text-gray-500">{asg.courseTitle || asg.course?.title} • Due {new Date(asg.dueDate).toLocaleDateString()}</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => navigate(`/admin/assignments/${asg._id}`)} className="px-3 py-1 bg-blue-700 text-white rounded-lg text-sm">View</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
   );
 
   const PaymentsTab = () => (
@@ -1022,7 +1272,7 @@ export default function AdminDashboard() {
                   <td className="p-2">{p.studentName || p.student?.name}</td>
                   <td>{p.courseTitle || p.course?.title}</td>
                   <td>{p.amount ?? p.price ?? 0}</td>
-                  <td>{new Date(p.date || p.createdAt).toLocaleDateString()}</td>
+                  <td>{formatDate(p.date || p.createdAt)}</td>
                   <td>{p.status || "completed"}</td>
                   <td className="p-2 flex gap-2">
                     <button disabled={isProcessing(p._id)} onClick={() => approvePayout(p._id)} className="px-2 py-1 bg-green-600 text-white rounded text-xs">Approve</button>
@@ -1039,7 +1289,9 @@ export default function AdminDashboard() {
 
   const CertificatesTab = () => (
     <div className="space-y-6">
-      <CertificateGenerator users={users} courses={courses} onGenerate={generateCertificate} />
+      <Card>
+        <CertificateGenerator users={users} courses={courses} onGenerate={generateCertificate} />
+      </Card>
 
       <Card>
         <h3 className="text-lg font-semibold mb-3">Certificates ({certificates.length})</h3>
@@ -1051,7 +1303,7 @@ export default function AdminDashboard() {
               <div key={c._id ?? `cert-${m}`} className="flex items-center justify-between border rounded-lg p-3 bg-white">
                 <div>
                   <div className="font-medium">{c.userName || c.user?.name}</div>
-                  <div className="text-xs text-gray-500">{c.courseTitle || c.course?.title} • Issued {new Date(c.issuedAt || c.createdAt).toLocaleDateString()}</div>
+                  <div className="text-xs text-gray-500">{c.courseTitle || c.course?.title} • Issued {formatDate(c.issuedAt || c.createdAt)}</div>
                 </div>
                 <div className="flex gap-2">
                   <a href={c.url || c.certificateUrl} target="_blank" rel="noreferrer" className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm">View</a>
@@ -1065,35 +1317,6 @@ export default function AdminDashboard() {
     </div>
   );
 
-  const UsersTab = () => (
-    <Card>
-      <h3 className="text-lg font-semibold mb-4">Users ({users.length})</h3>
-      {users.length === 0 ? (
-        <p className="text-gray-500">No users.</p>
-      ) : (
-        <div className="space-y-3">
-          {users.map((u, n) => (
-            <div key={u._id ?? `user-${n}`} className="flex items-center gap-4 border rounded-lg p-3">
-              <img src={u.image || "https://cdn-icons-png.flaticon.com/512/194/194938.png"} alt={u.name || u.email} className="w-12 h-12 rounded-full object-cover" />
-              <div className="flex-1">
-                <div className="font-medium">{u.name || u.email}</div>
-                <div className="text-xs text-gray-500">{u.email}</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <select value={u.role || "student"} onChange={(e) => updateUserRole(u._id, e.target.value)} className="px-2 py-1 border rounded-lg">
-                  <option value="student">Student</option>
-                  <option value="instructor">Instructor</option>
-                  <option value="admin">Admin</option>
-                </select>
-                <button disabled={isProcessing(u._id)} onClick={() => deleteUser(u._id)} className="px-2 py-2 bg-red-600 text-white rounded-lg"><Trash2 className="w-4 h-4" /></button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
-  );
-
   const SettingsTab = () => (
     <Card>
       <h3 className="text-lg font-semibold mb-4">Platform Settings</h3>
@@ -1101,6 +1324,9 @@ export default function AdminDashboard() {
     </Card>
   );
 
+  /* -------------------------
+     Render
+     ------------------------- */
   if (loading) return <div className="p-8">Loading admin data…</div>;
 
   return (
@@ -1124,17 +1350,103 @@ export default function AdminDashboard() {
 
           <div className="space-y-6">
             {activeTab === "Overview" && <OverviewTab />}
-            {activeTab === "Instructors" && <InstructorsTab />}
+            {activeTab === "Instructors" && (
+              <section className="grid md:grid-cols-2 gap-6">
+                <div><InstructorForm initial={editingInstructor} onSave={saveInstructor} onCancel={() => setEditingInstructor(null)} /></div>
+                <div>
+                  <Card>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold">Instructors ({instructors.length})</h3>
+                      <div className="text-sm text-gray-500">Manage instructors</div>
+                    </div>
+
+                    {instructors.length === 0 ? (
+                      <p className="text-gray-500">No instructors yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {instructors.map((inst, idx) => (
+                          <div key={inst._id ?? `inst-${idx}`} className="flex items-center gap-4 border rounded-lg p-3">
+                            <img src={inst.image || "https://cdn-icons-png.flaticon.com/512/194/194938.png"} alt={inst.name} className="w-12 h-12 rounded-full object-cover" />
+                            <div className="flex-1">
+                              <div className="font-medium">{inst.name}</div>
+                              <div className="text-xs text-gray-500">{inst.email}</div>
+                              <div className="text-xs text-gray-400 line-clamp-2">{inst.bio}</div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => editInstructor(inst)} className="px-2 py-2 bg-gray-100 rounded hover:bg-gray-200" title="Edit">
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button disabled={isProcessing(inst._id)} onClick={() => deleteInstructor(inst._id)} className="px-2 py-2 bg-red-600 text-white rounded hover:bg-red-500" title="Delete">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </Card>
+                </div>
+              </section>
+            )}
             {activeTab === "Courses" && <CoursesTab />}
             {activeTab === "Enrollments" && <EnrollmentsTab />}
             {activeTab === "Attendance" && <AttendanceTab />}
-            {activeTab === "Assignments" && <AssignmentsTab />}
+            {activeTab === "Students" && <StudentsTab />}
             {activeTab === "Payments" && <PaymentsTab />}
             {activeTab === "Certificates" && <CertificatesTab />}
-            {activeTab === "Users" && <UsersTab />}
             {activeTab === "Settings" && <SettingsTab />}
           </div>
         </main>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------
+   StudentDetailsModal (placed at bottom to avoid hoisting-coupling)
+   kept after export to keep main component tidy.
+   If you prefer it earlier, move it up.
+   ------------------------- */
+function StudentDetailsModal({ student, onClose, enrollments }) {
+  if (!student) return null;
+  const studentEnrolls = (enrollments || []).filter((e) => {
+    const sid = e.studentId ?? pick(e, ["student._id", "student.id", "studentId"]);
+    const matchKey = student._id || student.id || student.email;
+    return String(sid) === String(matchKey) || String(sid) === String(student.email);
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-2xl">
+        <div className="flex items-start justify-between mb-4">
+          <h4 className="text-lg font-semibold">{student.name || student.email}</h4>
+          <button onClick={onClose} className="text-gray-500"><X /></button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3">
+          <div className="text-sm text-gray-600">Email: {student.email}</div>
+          <div className="text-sm text-gray-600">Role: {student.role || "student"}</div>
+          <div className="text-sm text-gray-600">Enrolled courses: {studentEnrolls.length}</div>
+          <div>
+            <h5 className="font-medium mt-2">Recent enrollments</h5>
+            {studentEnrolls.length === 0 ? (
+              <div className="text-sm text-gray-500">No enrollments</div>
+            ) : (
+              <ul className="text-sm space-y-1">
+                {studentEnrolls.slice(0, 5).map((e, i) => (
+                  <li key={e._id ?? i} className="flex justify-between">
+                    <span>{e.courseTitle || e.course?.title || "Untitled course"}</span>
+                    <span className="text-gray-400">{formatDate(e.createdAt || e.enrolledAt || Date.now())}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button onClick={onClose} className="px-3 py-1 bg-gray-200 rounded">Close</button>
+        </div>
       </div>
     </div>
   );

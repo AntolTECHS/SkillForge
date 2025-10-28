@@ -23,18 +23,25 @@ const app = express();
 // Connect to MongoDB
 connectDB();
 
-// Middlewares
-app.use(express.json({ limit: "10mb" })); // Parse JSON body
-app.use(express.urlencoded({ extended: true }));
-app.use(cors()); // Enable CORS
-app.use(morgan("dev")); // HTTP request logger
+// ✅ Proper CORS setup
+app.use(
+  cors({
+    origin: "http://localhost:5173", // your frontend port
+    credentials: true,
+  })
+);
 
-// Health check endpoint
+// Middlewares
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan("dev"));
+
+// Health check
 app.get("/", (req, res) => {
   res.send("🚀 LearnSphere API is running...");
 });
 
-// Register API routes
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/instructors", instructorRoutes);
@@ -42,7 +49,7 @@ app.use("/api/student", studentRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/payment", paymentRoutes);
 
-// Error handling middleware (should be last)
+// Error handling middleware
 app.use(errorHandler);
 
 // Start server
