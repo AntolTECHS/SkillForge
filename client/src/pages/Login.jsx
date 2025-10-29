@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Mail, Lock, LogIn, AlertCircle } from "lucide-react";
+import { Mail, Lock, LogIn, AlertCircle, Eye, EyeOff } from "lucide-react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -24,14 +25,20 @@ const Login = () => {
 
     try {
       setLoading(true);
-
-      // ✅ Use login() from AuthContext (no direct axios call)
       const res = await login(email, password);
-      const user = res?.user || res; // handle both possible shapes
+      const user = res?.user || res;
 
       // 🔹 Handle first-time login (for instructors/admins)
       if (res?.firstLogin) {
         navigate("/change-password", { state: { email: user.email } });
+        return;
+      }
+
+      // 🔹 Handle redirect after login (if redirected from ProtectedRoute)
+      const redirectTo = location.state?.from || null;
+
+      if (redirectTo) {
+        navigate(redirectTo);
         return;
       }
 
@@ -47,29 +54,29 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-xl p-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-blue-700 flex items-center justify-center px-4 py-12">
+      <div className="max-w-md w-full bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl p-8">
         <div className="flex justify-center mb-6">
           <div className="bg-blue-600 p-3 rounded-full">
             <LogIn className="w-8 h-8 text-white" />
           </div>
         </div>
 
-        <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">
-          Welcome Back
+        <h2 className="text-3xl font-bold text-center text-white mb-2">
+          Welcome Back to SkillForge
         </h2>
-        <p className="text-center text-gray-600 mb-8">
-          Sign in to access your account
+        <p className="text-center text-gray-300 mb-8">
+          Sign in to continue your learning journey
         </p>
 
-        {/* ✅ success message if redirected from password change */}
+        {/* ✅ Success message */}
         {location.state?.message && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6 text-sm">
+          <div className="bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded-lg mb-6 text-sm">
             {location.state.message}
           </div>
         )}
 
-        {/* 🔴 error display */}
+        {/* 🔴 Error message */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center">
             <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
@@ -82,9 +89,9 @@ const Login = () => {
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-gray-200 mb-2"
             >
-              Email address
+              Email Address
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -94,8 +101,7 @@ const Login = () => {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                placeholder="you@example.com"
+                className="w-full pl-10 pr-4 py-3 bg-white/10 text-white border border-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                 disabled={loading}
               />
             </div>
@@ -105,7 +111,7 @@ const Login = () => {
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-gray-200 mb-2"
             >
               Password
             </label>
@@ -113,31 +119,42 @@ const Login = () => {
               <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                placeholder="Enter your password"
+                className="w-full pl-10 pr-10 py-3 bg-white/10 text-white border border-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                 disabled={loading}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white"
+              >
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
             </div>
           </div>
 
+          {/* SIGN IN BUTTON */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-blue-400 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:bg-blue-400 disabled:cursor-not-allowed shadow-md"
           >
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
+        <p className="text-center text-sm text-gray-300 mt-6">
           Don’t have an account?{" "}
           <span
             onClick={() => navigate("/register")}
-            className="text-blue-600 hover:underline cursor-pointer"
+            className="text-blue-400 hover:underline cursor-pointer font-medium"
           >
             Register
           </span>

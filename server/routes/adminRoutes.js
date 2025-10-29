@@ -5,9 +5,8 @@ import {
   getAllUsers,
   getAllInstructors,
   deleteUser,
-  deleteInstructor, // ✅ added
+  deleteInstructor,
 } from "../controllers/adminController.js";
-
 import { protect } from "../middlewares/authMiddleware.js";
 import { authorizeRoles } from "../middlewares/roleMiddleware.js";
 
@@ -21,13 +20,13 @@ router.use(protect, authorizeRoles("admin"));
 // =====================
 router.post("/instructors", addInstructor);
 router.get("/instructors", getAllInstructors);
-router.delete("/instructors/:id", deleteInstructor); // ✅ NEW delete route
+router.delete("/instructors/:id", deleteInstructor);
 
 // =====================
 // 👥 User Management
 // =====================
 router.get("/users", getAllUsers);
-router.delete("/user/:id", deleteUser);
+router.delete("/users/:id", deleteUser);
 
 // =====================
 // 📊 Admin Dashboard Mock Data
