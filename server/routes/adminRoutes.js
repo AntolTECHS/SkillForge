@@ -48,6 +48,25 @@ router.get("/courses", (req, res) => {
   ]);
 });
 
+// NEW: handle PUT /courses/:id (admin update)
+// This is a minimal mock implementation so the frontend's PUT will succeed.
+// Replace with your real DB update logic (e.g., Mongoose, Sequelize) as needed.
+router.put("/courses/:id", (req, res) => {
+  const { id } = req.params;
+  const updates = req.body || {};
+  console.log(`Admin updating course ${id}`, updates);
+
+  // Mock response: echo back updated course object.
+  // In your real controller, find the course in DB, apply updates and return the updated document.
+  const updatedCourse = {
+    id,
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+
+  return res.status(200).json(updatedCourse);
+});
+
 router.get("/enrollments", (req, res) => {
   res.json([
     { id: 1, user: "Alice", course: "React Mastery" },

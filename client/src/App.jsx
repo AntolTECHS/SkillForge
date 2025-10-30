@@ -1,36 +1,48 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import Navbar from './components/Navbar';
-import ProtectedRoute from './components/ProtectedRoute';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import CourseDetails from './pages/CourseDetails';
-import PaymentSuccess from './pages/PaymentSuccess';
-import AdminPanel from './pages/AdminDashboard';
-import Courses from './pages/Courses';
-import InstructorDashboard from './pages/InstructorDashboard';
-import ChangePassword from './pages/ChangePassword'; // ✅ new import
+// src/App.jsx
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import Navbar from "./components/Navbar";
+import ProtectedRoute from "./components/ProtectedRoute";
+
+// Public pages
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Courses from "./pages/Courses";
+import CourseDetails from "./pages/CourseDetails";
+import PaymentSuccess from "./pages/PaymentSuccess";
+
+// User dashboard
+import Dashboard from "./pages/Dashboard";
+
+// Instructor pages
+import InstructorDashboard from "./pages/instructor/instructorDashboard";
+import ChangePassword from "./pages/instructor/changePassword";
+
+// Admin pages
+import AdminDashboard from "./pages/Admin/AdminDashboard";
+import AdminCourses from "./pages/Admin/courses";
+import AdminInstructors from "./pages/Admin/instructors";
 
 function AppLayout() {
   const location = useLocation();
-  const hideNavbar = location.pathname.startsWith('/admin'); // hide navbar for admin
+  const hideNavbar = location.pathname.startsWith("/admin"); // hide navbar for admin pages
 
   return (
     <div className="min-h-screen bg-gray-50">
       {!hideNavbar && <Navbar />}
 
       <Routes>
-        {/* Public routes */}
+        {/* Public Routes */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/courses" element={<Courses />} />
         <Route path="/course/:id" element={<CourseDetails />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
-        <Route path="/courses" element={<Courses />} />
 
-        {/* Protected: any logged-in user */}
+        {/* Protected User Dashboard */}
         <Route
           path="/dashboard"
           element={
@@ -40,32 +52,46 @@ function AppLayout() {
           }
         />
 
-        {/* Instructor-only */}
+        {/* Instructor Routes */}
         <Route
           path="/instructor"
           element={
-            <ProtectedRoute allowedRoles={['instructor']}>
+            <ProtectedRoute allowedRoles={["instructor"]}>
               <InstructorDashboard />
             </ProtectedRoute>
           }
         />
-
-        {/* ✅ New: Change password page (for instructors on first login) */}
         <Route
-          path="/change-password"
+          path="/instructor/change-password"
           element={
-            <ProtectedRoute allowedRoles={['instructor']}>
+            <ProtectedRoute allowedRoles={["instructor"]}>
               <ChangePassword />
             </ProtectedRoute>
           }
         />
 
-        {/* Admin-only */}
+        {/* Admin Routes */}
         <Route
           path="/admin"
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminPanel />
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/courses"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminCourses />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/instructors"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminInstructors />
             </ProtectedRoute>
           }
         />
@@ -74,7 +100,7 @@ function AppLayout() {
   );
 }
 
-function App() {
+export default function App() {
   return (
     <Router>
       <AuthProvider>
@@ -83,5 +109,3 @@ function App() {
     </Router>
   );
 }
-
-export default App;

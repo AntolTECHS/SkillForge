@@ -1,7 +1,9 @@
+
 // AdminDashboard.jsx
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "../api/axios";
+import axios from "../../api/axios";
+
 import { motion } from "framer-motion";
 import {
   Menu,
@@ -30,6 +32,11 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+
+/* -------------------------
+   Useful constants
+   ------------------------- */
+const DEFAULT_PLACEHOLDER = "https://placehold.co/120x80";
 
 /* -------------------------
    Pure helpers (defined before hooks so no hoisting issues)
@@ -63,6 +70,7 @@ function normalizeList(data) {
     data.documents,
     data.records,
     data.list,
+    data.courses,
   ];
 
   for (const c of candidates) {
@@ -262,6 +270,80 @@ function CertificateGenerator({ users = [], courses = [], onGenerate }) {
 }
 
 /* -------------------------
+   Course edit form modal
+   ------------------------- */
+function CourseFormModal({ course, onClose, onSave, canEditInstructorList = [] }) {
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    price: 0,
+    category: "",
+    image: "",
+    instructorId: "",
+  });
+
+  useEffect(() => {
+    if (course) {
+      setForm({
+        title: course.title || "",
+        description: course.description || "",
+        price: typeof course.price !== 'undefined' ? course.price : 0,
+        category: course.category || "",
+        image: course.image || course.thumbnail || "",
+        instructorId: pick(course, ['instructor._id','instructorId','teacherId','instructorId']) || course.instructor || "",
+      });
+    }
+  }, [course]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((s) => ({ ...s, [name]: value }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave && onSave(form);
+  };
+
+  if (!course) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-2xl">
+        <div className="flex items-start justify-between mb-4">
+          <h4 className="text-lg font-semibold">Edit Course</h4>
+          <button onClick={onClose} className="text-gray-500"><X /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3">
+          <input name="title" value={form.title} onChange={handleChange} placeholder="Title" className="px-3 py-2 border rounded" />
+          <textarea name="description" value={form.description} onChange={handleChange} placeholder="Description" className="px-3 py-2 border rounded" />
+          <div className="grid grid-cols-2 gap-2">
+            <input name="price" value={form.price} onChange={handleChange} type="number" className="px-3 py-2 border rounded" />
+            <input name="category" value={form.category} onChange={handleChange} placeholder="Category" className="px-3 py-2 border rounded" />
+          </div>
+          <input name="image" value={form.image} onChange={handleChange} placeholder="Image URL" className="px-3 py-2 border rounded" />
+
+          {canEditInstructorList && canEditInstructorList.length > 0 && (
+            <select name="instructorId" value={form.instructorId} onChange={handleChange} className="px-3 py-2 border rounded">
+              <option value="">Select instructor</option>
+              {canEditInstructorList.map((i) => (
+                <option key={i._id ?? i.id} value={i._id ?? i.id}>{i.name || i.email}</option>
+              ))}
+            </select>
+          )}
+
+          <div className="flex justify-end gap-2 mt-2">
+            <button type="button" onClick={onClose} className="px-3 py-1 bg-gray-200 rounded">Cancel</button>
+            <button type="submit" className="px-3 py-1 bg-blue-700 text-white rounded">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------
    Main admin dashboard component
    ------------------------- */
 export default function AdminDashboard() {
@@ -288,8 +370,30 @@ export default function AdminDashboard() {
   const [selectAllStudents, setSelectAllStudents] = useState(false);
   const [studentModal, setStudentModal] = useState(null);
 
+  // Course edit modal state
+  const [editingCourse, setEditingCourse] = useState(null);
+
   const navigate = useNavigate();
   const pollRef = useRef(null);
+
+  // determine current user and role
+  const currentUser = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
+  }, []);
+  const currentRole = (currentUser.role || '').toString().toLowerCase();
+
+  const canEditCourse = useCallback((course) => {
+    if (!course) return false;
+    if (currentRole === 'admin') return true;
+    if (currentRole === 'instructor') {
+      // check common instructor id/email fields on course
+      const cid = pick(course, ['instructor._id','instructorId','teacherId','instructorId','teacherId']);
+      const cemail = pick(course, ['instructor.email','instructorEmail','teacherEmail']);
+      if (cid && (String(cid) === String(currentUser._id) || String(cid) === String(currentUser.id))) return true;
+      if (cemail && currentUser.email && String(cemail).toLowerCase() === String(currentUser.email).toLowerCase()) return true;
+    }
+    return false;
+  }, [currentRole, currentUser]);
 
   /* -------------------------
      Fetch helpers
@@ -381,7 +485,8 @@ export default function AdminDashboard() {
       ] = await Promise.all([
         fetchResource("/admin/overview", null, {}),
         fetchResource("/admin/instructors", "/instructors", []),
-        fetchResource("/admin/courses", "/courses", []),
+        // prefer public /courses first, fallback to /admin/courses
+        fetchResource("/courses", "/admin/courses", []),
         fetchResource("/admin/enrollments", "/enrollments", []),
         fetchResource("/admin/attendance", "/attendance", []),
         fetchResource("/admin/assignments", "/assignments", []),
@@ -401,6 +506,24 @@ export default function AdminDashboard() {
         ? coursesData
         : coursesData?.courses ?? coursesData?.data ?? coursesData ?? [];
       setCourses(normalizedCourses);
+
+      // if nothing found, try common /api prefixed endpoints (some backends expose under /api/)
+      if (!normalizedCourses || normalizedCourses.length === 0) {
+        try {
+          const resApi = await axios.get('/api/courses');
+          const apiCourses = normalizeList(resApi.data ?? resApi);
+          if (apiCourses && apiCourses.length) {
+            setCourses(apiCourses);
+          } else {
+            // try admin api path
+            const resApi2 = await axios.get('/api/admin/courses').catch(() => ({}));
+            const apiCourses2 = normalizeList(resApi2.data ?? resApi2);
+            if (apiCourses2 && apiCourses2.length) setCourses(apiCourses2);
+          }
+        } catch (e) {
+          // ignore if no /api endpoints
+        }
+      }
 
       const eList = normalizeList(enrollmentsData);
       if (eList.length) setEnrollments(eList);
@@ -595,6 +718,45 @@ export default function AdminDashboard() {
     [fetchAllData]
   );
 
+  // COURSES SYNC: attempts several likely endpoints, then refreshes data
+  const handleSyncCoursera = useCallback(async () => {
+    if (!confirm("Fetch & save Coursera courses to the platform?")) return;
+    addProcessing("sync-coursera");
+    try {
+      const syncEndpoints = [
+        "/admin/courses/sync",
+        "/courses/sync",
+        "/admin/sync-coursera",
+        "/sync-coursera",
+        "/admin/import-coursera",
+        "/import-coursera",
+        "/admin/courses/import",
+        "/courses/import",
+      ];
+
+      let ok = false;
+      for (const url of syncEndpoints) {
+        try {
+          await axios.post(url);
+          ok = true;
+          break;
+        } catch (e) {
+          // try next
+        }
+      }
+
+      if (!ok) throw new Error("No sync endpoint succeeded");
+
+      await fetchAllData();
+      alert("Coursera sync completed.");
+    } catch (err) {
+      console.error("Sync failed:", err);
+      alert("Coursera sync failed. Check server logs or try the import script.");
+    } finally {
+      removeProcessing("sync-coursera");
+    }
+  }, [fetchAllData]);
+
   const generateCertificate = useCallback(
     async ({ userId, courseId, grade }) => {
       if (!userId || !courseId) {
@@ -612,7 +774,7 @@ export default function AdminDashboard() {
     [fetchAllData]
   );
 
-  const revokeCertificate = useCallback(
+  const revokeCertificateLocal = useCallback(
     async (certId) => {
       if (!confirm("Revoke this certificate?")) return;
       addProcessing(certId);
@@ -658,6 +820,102 @@ export default function AdminDashboard() {
     },
     [fetchAllData]
   );
+
+  // update course: admin or instructor (their own courses)
+  
+  // update course: admin or instructor (their own courses)
+  const saveCourse = useCallback(async (updatedFields) => {
+    if (!editingCourse) return;
+    addProcessing(editingCourse._id ?? editingCourse.id ?? 'course-save');
+    try {
+      const id = editingCourse._id ?? editingCourse.id;
+      // Common endpoint candidates (various prefix combos)
+      const endpoints = [
+        `/admin/courses/${id}`,
+        `/courses/${id}`,
+        `/instructor/courses/${id}`,
+        `/api/admin/courses/${id}`,
+        `/api/courses/${id}`,
+        `/api/instructor/courses/${id}`,
+      ];
+
+      const tried = [];
+      let success = false;
+      const base = axios?.defaults?.baseURL || "";
+
+      // helper to attempt a single URL (absolute or relative)
+      const attempt = async (url) => {
+        if (!url || tried.includes(url)) return false;
+        tried.push(url);
+        try {
+          console.log("Attempting course update:", url);
+          // If url looks absolute (starts with http) axios will use it as-is.
+          await axios.put(url, updatedFields);
+          return true;
+        } catch (err) {
+          // record failures for debugging
+          console.warn("Update attempt failed for", url, err?.response?.status, err?.response?.data);
+          return false;
+        }
+      };
+
+      for (const ep of endpoints) {
+        // try as-is
+        if (await attempt(ep)) { success = true; break; }
+
+        // try stripping leading /api if present and server might already mount /api as baseURL
+        if (ep.startsWith("/api")) {
+          const withoutApi = ep.replace(/^\/api/, "");
+          if (await attempt(withoutApi)) { success = true; break; }
+        }
+
+        // try absolute URL if axios.defaults.baseURL is set
+        if (base) {
+          try {
+            const baseNoSlash = base.replace(/\/$/, "");
+            const full = baseNoSlash + ep;
+            if (await attempt(full)) { success = true; break; }
+
+            // also try when base contains /api and ep has /api (to avoid double /api)
+            if (baseNoSlash.includes("/api")) {
+              const baseStripApi = baseNoSlash.replace(/\/api\/?$/, "");
+              const epStripApi = ep.replace(/^\/api/, "");
+              const altFull = baseStripApi + epStripApi;
+              if (await attempt(altFull)) { success = true; break; }
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+
+      // if no PUT succeeded, try PATCH on tried URLs
+      if (!success) {
+        for (const url of tried) {
+          try {
+            console.log("Attempting PATCH fallback:", url);
+            await axios.patch(url, updatedFields);
+            success = true;
+            break;
+          } catch (e) {
+            // continue
+          }
+        }
+      }
+
+      if (!success) throw new Error("No working course update endpoint found. Tried: " + JSON.stringify(tried.slice(0, 20)));
+
+      await fetchAllData();
+      setEditingCourse(null);
+      alert("Course updated");
+    } catch (err) {
+      console.error("Failed to update course", err);
+      alert(err.response?.data?.message || err.message || "Failed to update course");
+    } finally {
+      removeProcessing(editingCourse._id ?? editingCourse.id ?? "course-save");
+    }
+  }, [editingCourse, fetchAllData]);
+
 
   // bulk student actions
   const toggleSelectStudent = (id) => {
@@ -863,7 +1121,7 @@ export default function AdminDashboard() {
     </aside>
   );
 
-  // Overview: always use live computed counts (users + enrollments)
+  // Overview: always use live computed counts (users & enrollments)
   const OverviewTab = () => {
     const preview = (items) => (Array.isArray(items) ? items.slice(0, 3) : []);
 
@@ -1081,35 +1339,61 @@ export default function AdminDashboard() {
   /* -------------------------
      Other tabs (Courses, Enrollments, Attendance, Payments, Certificates, Settings)
      ------------------------- */
-  const CoursesTab = () => (
-    <Card>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Courses ({courses.length})</h3>
-        <div className="text-sm text-gray-500">Admin can view courses</div>
-      </div>
+  const CoursesTab = () => {
+    // normalize possible response shapes and ensure we have a simple array
+    const list = normalizeList(courses.length ? courses : (courses?.courses ?? courses?.data ?? courses)) || [];
 
-      {courses.length === 0 ? (
-        <p className="text-gray-500">No courses yet.</p>
-      ) : (
-        <div className="space-y-3">
-          {courses.map((c, idx) => (
-            <div key={c._id ?? `course-${idx}`} className="flex items-center gap-4 border rounded-lg p-3">
-              <div className="w-28 h-16 rounded overflow-hidden bg-gray-100 flex-shrink-0">
-                <img src={c.image || "https://via.placeholder.com/120x80"} alt={c.title} className="w-full h-full object-cover" />
-              </div>
-              <div className="flex-1">
-                <div className="font-medium">{c.title}</div>
-                <div className="text-xs text-gray-500">{c.subtitle} • {c.level}</div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => navigate(`/courses/${c._id}`)} className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm">View</button>
-              </div>
-            </div>
-          ))}
+    return (
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Courses ({list.length})</h3>
+          <div className="flex items-center gap-2">
+            <button onClick={() => fetchAllData()} className="px-3 py-1 bg-gray-200 rounded text-sm">Refresh</button>
+            <button
+              disabled={isProcessing("sync-coursera")}
+              onClick={handleSyncCoursera}
+              className="px-3 py-1 bg-blue-700 text-white rounded text-sm"
+              title="Fetch & save Coursera courses"
+            >
+              {isProcessing("sync-coursera") ? "Syncing…" : "Sync Coursera"}
+            </button>
+          </div>
         </div>
-      )}
-    </Card>
-  );
+
+        {list.length === 0 ? (
+          <p className="text-gray-500">No courses yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {list.map((c, idx) => (
+              <div key={c._id ?? c.id ?? `course-${idx}`} className="flex items-center gap-4 border rounded-lg p-3">
+                <div className="w-28 h-16 rounded overflow-hidden bg-gray-100 flex-shrink-0">
+                  <img src={c.image || c.thumbnail || c.photoUrl || DEFAULT_PLACEHOLDER} alt={c.title} className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium">{c.title}</div>
+                  <div className="text-xs text-gray-500">
+                    {(c.subtitle || c.description || "").slice(0, 120)} { (c.description && c.description.length > 120) ? "…" : "" }
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">Category: {c.category || c.level || "—"}</div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="font-semibold">${typeof c.price !== "undefined" ? c.price : 0}</div>
+                  <div className="flex gap-2">
+                    <button onClick={() => navigate(`/courses/${c._id ?? c.id}`)} className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm">View</button>
+                    {canEditCourse(c) && (
+                      <button onClick={() => setEditingCourse(c)} className="px-3 py-1 bg-yellow-500 text-white rounded-lg text-sm flex items-center gap-2"><Edit2 className="w-4 h-4" /> Edit</button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <CourseFormModal course={editingCourse} onClose={() => setEditingCourse(null)} onSave={saveCourse} canEditInstructorList={instructors} />
+      </Card>
+    );
+  };
 
   const EnrollmentsTab = () => (
     <Card>
@@ -1307,7 +1591,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex gap-2">
                   <a href={c.url || c.certificateUrl} target="_blank" rel="noreferrer" className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm">View</a>
-                  <button disabled={isProcessing(c._id)} onClick={() => revokeCertificate(c._id)} className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm">Revoke</button>
+                  <button disabled={isProcessing(c._id)} onClick={() => revokeCertificateLocal(c._id)} className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm">Revoke</button>
                 </div>
               </div>
             ))}
@@ -1404,8 +1688,6 @@ export default function AdminDashboard() {
 
 /* -------------------------
    StudentDetailsModal (placed at bottom to avoid hoisting-coupling)
-   kept after export to keep main component tidy.
-   If you prefer it earlier, move it up.
    ------------------------- */
 function StudentDetailsModal({ student, onClose, enrollments }) {
   if (!student) return null;
