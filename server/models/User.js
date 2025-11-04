@@ -1,6 +1,24 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
+const enrolledCourseSchema = new mongoose.Schema({
+  course: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Course",
+  },
+  enrolledAt: {
+    type: Date,
+    default: Date.now,
+  },
+  trialExpiresAt: {
+    type: Date, // Automatically set to enrolledAt + 21 days
+  },
+  hasPaid: {
+    type: Boolean,
+    default: false,
+  },
+});
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -29,23 +47,23 @@ const userSchema = new mongoose.Schema(
       default: "student",
     },
 
-    // 👇 For instructors added by admin who must change password on first login
     isFirstLogin: {
       type: Boolean,
       default: false,
     },
 
-    // 👇 Indicates if this account was created by an admin
     createdByAdmin: {
       type: Boolean,
       default: false,
     },
 
-    // 👇 Allows deactivating accounts (e.g. suspend student/instructor)
     isActive: {
       type: Boolean,
       default: true,
     },
+
+    // ✅ Track enrollments, free trial, and payments
+    enrolledCourses: [enrolledCourseSchema],
   },
   { timestamps: true }
 );
@@ -61,6 +79,18 @@ userSchema.pre("save", async function (next) {
 // 🔑 Compare passwords
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// ✅ Automatically set trial expiry (21 days from enrollment)
+userSchema.methods.addCourseEnrollment = function (courseId, trialDays = 21) {
+  const now = new Date();
+  const trialExpiresAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+  this.enrolledCourses.push({
+    course: courseId,
+    enrolledAt: now,
+    trialExpiresAt,
+    hasPaid: false,
+  });
 };
 
 const User = mongoose.model("User", userSchema);

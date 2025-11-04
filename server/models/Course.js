@@ -1,36 +1,44 @@
+// models/Course.js
 import mongoose from "mongoose";
 
-const courseSchema = new mongoose.Schema(
-  {
-    title: { type: String, required: true, trim: true },
-    description: { type: String, required: true },
-    category: { type: String, required: true },
-    price: { type: Number, default: 0 },
+/* ------------------------ Lesson Model ------------------------ */
+const lessonSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: String,
+  videoUrl: String,
+}, { timestamps: true });
 
-    // Coursera / External API integration fields
-    externalId: { type: String, index: true },
-    provider: { type: String, default: "local" },
-    partnerIds: [String],
-    lastSynced: Date,
+export const Lesson = mongoose.models.Lesson || mongoose.model("Lesson", lessonSchema);
 
-    instructor: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+/* ------------------------ Module Model ------------------------ */
+const moduleSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  lessons: [{ type: mongoose.Schema.Types.ObjectId, ref: "Lesson" }],
+}, { timestamps: true });
+
+export const Module = mongoose.models.Module || mongoose.model("Module", moduleSchema);
+
+/* ------------------------ Quiz Model ------------------------ */
+const quizSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  questions: [
+    {
+      question: { type: String, required: true },
+      options: [String],
+      correctAnswer: String,
     },
+  ],
+}, { timestamps: true });
 
-    videos: [
-      {
-        title: String,
-        url: String,
-        duration: String,
-      },
-    ],
+export const Quiz = mongoose.models.Quiz || mongoose.model("Quiz", quizSchema);
 
-    quizzes: [{ type: mongoose.Schema.Types.ObjectId, ref: "Quiz" }],
-    students: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-  },
-  { timestamps: true }
-);
+/* ------------------------ Course Model ------------------------ */
+const courseSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: String,
+  instructor: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  modules: [{ type: mongoose.Schema.Types.ObjectId, ref: "Module" }],
+  quizzes: [{ type: mongoose.Schema.Types.ObjectId, ref: "Quiz" }],
+}, { timestamps: true });
 
-const Course = mongoose.model("Course", courseSchema);
-export default Course;
+export default mongoose.models.Course || mongoose.model("Course", courseSchema);

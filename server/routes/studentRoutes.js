@@ -1,22 +1,53 @@
 import express from "express";
 import {
+  getAvailableCourses,   // ✅ newly added for /courses
   enrollInCourse,
-  getEnrolledCourses,   // ✅ correct function name
+  getEnrolledCourses,    // ✅ for /my-courses
   getCourseProgress,
   submitQuiz,
+  generateCertificate,
 } from "../controllers/studentController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import { authorizeRoles } from "../middlewares/roleMiddleware.js";
 
 const router = express.Router();
 
-// Protect all routes for students only
+/* ============================================================
+   ✅ All student routes are protected & require "student" role
+   ============================================================ */
 router.use(protect, authorizeRoles("student"));
 
-// Routes
+/* ============================================================
+   📘 Course browsing & enrollment
+   ============================================================ */
+
+// 🔹 Get all available courses (student dashboard / browse page)
+router.get("/courses", getAvailableCourses);
+
+// 🔹 Get student's enrolled courses
+router.get("/my-courses", getEnrolledCourses);
+
+// 🔹 Enroll in a specific course
 router.post("/enroll/:courseId", enrollInCourse);
-router.get("/my-courses", getEnrolledCourses);  // ✅ updated
+
+/* ============================================================
+   🧠 Learning progress & quizzes
+   ============================================================ */
+
+// 🔹 Get progress for a single course
 router.get("/progress/:courseId", getCourseProgress);
+
+// 🔹 Submit quiz answers
 router.post("/quiz/:quizId/submit", submitQuiz);
 
+/* ============================================================
+   🎓 Certificate generation
+   ============================================================ */
+
+// 🔹 Generate a course completion certificate
+router.post("/certificate/:courseId", generateCertificate);
+
+/* ============================================================
+   ✅ Export router
+   ============================================================ */
 export default router;

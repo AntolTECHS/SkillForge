@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Courses from "./pages/Courses";
 import CourseDetails from "./pages/CourseDetails";
+import CourseContent from "./pages/CourseContent"; // ✅ NEW
 import PaymentSuccess from "./pages/PaymentSuccess";
 
 // User dashboard
@@ -40,6 +41,14 @@ function AppLayout() {
         <Route path="/register" element={<Register />} />
         <Route path="/courses" element={<Courses />} />
         <Route path="/course/:id" element={<CourseDetails />} />
+        <Route
+          path="/courses/:id/content"
+          element={
+            <ProtectedRoute>
+              <CourseContent />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/payment/success" element={<PaymentSuccess />} />
 
         {/* Protected User Dashboard */}

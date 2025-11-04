@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import axios from "../api/axios";
 
-const AuthContext = createContext(null);
+export const AuthContext = createContext(null); // ✅ now exported
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
@@ -26,10 +26,9 @@ export const AuthProvider = ({ children }) => {
     }
   });
 
-  const [firstLogin, setFirstLogin] = useState(() => {
-    return localStorage.getItem("firstLogin") === "true";
-  });
-
+  const [firstLogin, setFirstLogin] = useState(
+    localStorage.getItem("firstLogin") === "true"
+  );
   const [loading, setLoading] = useState(true);
   const [authenticating, setAuthenticating] = useState(false);
 
@@ -77,15 +76,11 @@ export const AuthProvider = ({ children }) => {
     }
   }, [attachTokenToAxios]);
 
-  // ==============================
-  // Run once on app mount
-  // ==============================
   useEffect(() => {
     const reqInterceptor = axios.interceptors.request.use(
       (config) => {
         const t = localStorage.getItem("token");
-        if (t)
-          config.headers = { ...config.headers, Authorization: `Bearer ${t}` };
+        if (t) config.headers = { ...config.headers, Authorization: `Bearer ${t}` };
         return config;
       },
       (err) => Promise.reject(err)
@@ -93,7 +88,6 @@ export const AuthProvider = ({ children }) => {
 
     const token = localStorage.getItem("token");
 
-    // ✅ Only run validation if token exists and user not yet set
     if (token && !user) {
       console.log("🟢 Found token, validating session...");
       validateSession();
@@ -154,9 +148,7 @@ export const AuthProvider = ({ children }) => {
   // REGISTER HANDLER
   // ==============================
   const register = async (name, email, password, role = "student") => {
-    console.log("🪵 REGISTER ATTEMPT:", { name, email, role });
     setAuthenticating(true);
-
     try {
       const res = await axios.post("/auth/register", {
         name,
@@ -168,19 +160,13 @@ export const AuthProvider = ({ children }) => {
       const token = res.data?.token || res.data?.accessToken;
       const returnedUser = res.data?.user || res.data;
 
-      console.log("✅ REGISTER SUCCESS:", returnedUser);
-
       if (!token) throw new Error("No token returned from register");
 
       localStorage.setItem("token", token);
       attachTokenToAxios();
 
-      if (returnedUser && returnedUser.role) {
-        setUser(returnedUser);
-        localStorage.setItem("user", JSON.stringify(returnedUser));
-      } else {
-        await validateSession();
-      }
+      setUser(returnedUser);
+      localStorage.setItem("user", JSON.stringify(returnedUser));
 
       return res.data;
     } catch (err) {
@@ -192,10 +178,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ==============================
-  // LOGOUT HANDLER
+  // LOGOUT
   // ==============================
   const logout = async (callServer = false) => {
-    console.log("🚪 Logging out...");
     try {
       if (callServer) await axios.post("/auth/logout").catch(() => {});
     } finally {
@@ -205,20 +190,15 @@ export const AuthProvider = ({ children }) => {
       delete axios.defaults.headers.common["Authorization"];
       setUser(null);
       setFirstLogin(false);
-      console.log("✅ Logged out successfully.");
     }
   };
 
-  // ==============================
-  // REFRESH USER DETAILS
-  // ==============================
   const refreshUser = async () => {
     try {
       const res = await axios.get("/auth/me");
       const fetchedUser = res.data?.user || res.data;
       setUser(fetchedUser);
       localStorage.setItem("user", JSON.stringify(fetchedUser));
-      console.log("🔄 User refreshed:", fetchedUser);
       return fetchedUser;
     } catch (err) {
       console.warn("⚠️ Failed to refresh user:", err);
@@ -226,27 +206,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const isAuthenticated = !!user;
-  const isAdmin = !!user && (user.role === "admin" || user.isAdmin === true);
-  const isInstructor = !!user && user.role === "instructor";
-
   const value = {
     user,
     loading,
     authenticating,
-    isAuthenticated,
-    isAdmin,
-    isInstructor,
-    firstLogin,
+    isAuthenticated: !!user,
     login,
     register,
     logout,
     refreshUser,
-    validateSession,
     setUser,
   };
 
-  return (
-    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
