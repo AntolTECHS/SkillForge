@@ -1,21 +1,28 @@
 // src/App.jsx
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { SidebarProvider } from "./context/SidebarContext"; // ✅ import here
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 
-// Public pages
-import Home from "./pages/Home";
+// Auth pages
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Courses from "./pages/Courses";
-import CourseDetails from "./pages/CourseDetails";
-import CourseContent from "./pages/CourseContent"; // ✅ NEW
-import PaymentSuccess from "./pages/PaymentSuccess";
 
-// User dashboard
-import Dashboard from "./pages/Dashboard";
+// Student pages / layout
+import StudentLayout from "./pages/student/StudentLayout";
+import StudentDashboard from "./pages/student/StudentDashboard";
+import StudentCourses from "./pages/student/StudentCourses";
+import StudentChat from "./pages/student/StudentChat";
+import StudentCertificates from "./pages/student/StudentCertificates";
+import StudentRewards from "./pages/student/StudentRewards";
 
 // Instructor pages
 import InstructorDashboard from "./pages/instructor/instructorDashboard";
@@ -26,42 +33,52 @@ import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminCourses from "./pages/Admin/courses";
 import AdminInstructors from "./pages/Admin/instructors";
 
+// Payment success
+import PaymentSuccess from "./pages/PaymentSuccess";
+
 function AppLayout() {
   const location = useLocation();
-  const hideNavbar = location.pathname.startsWith("/admin"); // hide navbar for admin pages
+  const { isAuthenticated } = useAuth();
+
+  const hideNavbar =
+    location.pathname.startsWith("/admin") ||
+    location.pathname.startsWith("/student");
 
   return (
     <div className="min-h-screen bg-gray-50">
       {!hideNavbar && <Navbar />}
 
       <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Home />} />
+        <Route
+          path="/"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/student/dashboard" replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/courses" element={<Courses />} />
-        <Route path="/course/:id" element={<CourseDetails />} />
+
         <Route
-          path="/courses/:id/content"
+          path="/student"
           element={
-            <ProtectedRoute>
-              <CourseContent />
+            <ProtectedRoute allowedRoles={["student"]}>
+              <StudentLayout />
             </ProtectedRoute>
           }
-        />
-        <Route path="/payment/success" element={<PaymentSuccess />} />
+        >
+          <Route index element={<StudentDashboard />} />
+          <Route path="dashboard" element={<StudentDashboard />} />
+          <Route path="courses" element={<StudentCourses />} />
+          <Route path="chat" element={<StudentChat />} />
+          <Route path="certificates" element={<StudentCertificates />} />
+          <Route path="rewards" element={<StudentRewards />} />
+        </Route>
 
-        {/* Protected User Dashboard */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Instructor Routes */}
         <Route
           path="/instructor"
           element={
@@ -79,7 +96,6 @@ function AppLayout() {
           }
         />
 
-        {/* Admin Routes */}
         <Route
           path="/admin"
           element={
@@ -104,6 +120,9 @@ function AppLayout() {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/payment/success" element={<PaymentSuccess />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   );
@@ -113,7 +132,10 @@ export default function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppLayout />
+        <SidebarProvider>
+          {/* ✅ Wrap entire app here */}
+          <AppLayout />
+        </SidebarProvider>
       </AuthProvider>
     </Router>
   );
