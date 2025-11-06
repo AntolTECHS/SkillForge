@@ -1,92 +1,63 @@
-import React, { useEffect, useState } from "react";
-import { getInstructorCourses, syncCourseraCourses } from "../../api/courseApi";
-import { useAuth } from "../../context/AuthContext";
+// pages/InstructorDashboard.jsx
+import { useState } from "react";
+import axios from "axios";
 
 const InstructorDashboard = () => {
-  const { user } = useAuth();
-  const [courses, setCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [courseData, setCourseData] = useState({
+    title: "",
+    description: "",
+    image: "",
+    duration: "",
+  });
 
-  const fetchCourses = async () => {
-    try {
-      const data = await getInstructorCourses();
-      setCourses(data);
-    } catch (err) {
-      console.error("❌ Failed to fetch courses:", err);
-    } finally {
-      setLoading(false);
-    }
+  const handleChange = (e) => {
+    setCourseData({ ...courseData, [e.target.name]: e.target.value });
   };
 
-  const handleSync = async () => {
-    try {
-      const res = await syncCourseraCourses();
-      alert(res.message);
-      fetchCourses();
-    } catch (err) {
-      console.error(err);
-      alert("Sync failed");
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem("token");
+    await axios.post("http://localhost:5000/api/courses", courseData, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    alert("Course created successfully!");
   };
-
-  useEffect(() => {
-    fetchCourses();
-  }, []);
-
-  if (loading) return <div className="text-center p-10">Loading...</div>;
 
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6">
-        👩‍🏫 {user?.name || "Instructor"}'s Dashboard
-      </h1>
-
-      <div className="flex justify-between mb-6">
+    <div className="max-w-md mx-auto bg-white p-6 rounded-xl shadow">
+      <h2 className="text-xl font-bold mb-4 text-sky-600">Create New Course</h2>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <input
+          name="title"
+          placeholder="Course title"
+          className="border w-full p-2 rounded"
+          onChange={handleChange}
+        />
+        <input
+          name="description"
+          placeholder="Description"
+          className="border w-full p-2 rounded"
+          onChange={handleChange}
+        />
+        <input
+          name="image"
+          placeholder="Image URL"
+          className="border w-full p-2 rounded"
+          onChange={handleChange}
+        />
+        <input
+          name="duration"
+          placeholder="Duration"
+          className="border w-full p-2 rounded"
+          onChange={handleChange}
+        />
         <button
-          onClick={handleSync}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+          type="submit"
+          className="bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700"
         >
-          Sync Coursera Courses
+          Publish Course
         </button>
-        <button
-          onClick={() => alert("Course creation modal here")}
-          className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
-        >
-          + New Course
-        </button>
-      </div>
-
-      {courses.length === 0 ? (
-        <p>No courses found.</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses.map((course) => (
-            <div
-              key={course._id}
-              className="bg-white p-4 rounded-xl shadow hover:shadow-lg transition"
-            >
-              <h2 className="text-xl font-semibold mb-2">{course.title}</h2>
-              <p className="text-gray-600 mb-2">
-                {course.description?.slice(0, 80) || "No description"}...
-              </p>
-              <p className="text-sm text-gray-500 mb-2">
-                Category: {course.category}
-              </p>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">
-                  Price: ${course.price}
-                </span>
-                <button
-                  onClick={() => alert(`Edit ${course._id}`)}
-                  className="text-indigo-600 hover:underline"
-                >
-                  Edit
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      </form>
     </div>
   );
 };

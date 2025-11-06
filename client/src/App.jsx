@@ -23,6 +23,7 @@ import StudentCourses from "./pages/student/StudentCourses";
 import StudentChat from "./pages/student/StudentChat";
 import StudentCertificates from "./pages/student/StudentCertificates";
 import StudentRewards from "./pages/student/StudentRewards";
+import CommunityPage from "./pages/student/Community"; // <-- added
 
 // Instructor pages
 import InstructorDashboard from "./pages/instructor/instructorDashboard";
@@ -40,6 +41,8 @@ function AppLayout() {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
 
+  // hide the top-level global Navbar for student & admin areas because those layouts
+  // render their own navbar/sidebar. Keep global navbar for public / auth pages.
   const hideNavbar =
     location.pathname.startsWith("/admin") ||
     location.pathname.startsWith("/student");
@@ -71,12 +74,14 @@ function AppLayout() {
             </ProtectedRoute>
           }
         >
+          {/* nested student routes (rendered inside StudentLayout <Outlet />) */}
           <Route index element={<StudentDashboard />} />
           <Route path="dashboard" element={<StudentDashboard />} />
           <Route path="courses" element={<StudentCourses />} />
           <Route path="chat" element={<StudentChat />} />
           <Route path="certificates" element={<StudentCertificates />} />
           <Route path="rewards" element={<StudentRewards />} />
+          <Route path="community" element={<CommunityPage />} /> {/* <-- new */}
         </Route>
 
         <Route
