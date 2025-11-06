@@ -1,3 +1,4 @@
+// models/Quiz.js
 import mongoose from "mongoose";
 
 const quizSchema = new mongoose.Schema(
@@ -6,8 +7,8 @@ const quizSchema = new mongoose.Schema(
     questions: [
       {
         question: { type: String, required: true },
-        options: [String],
-        correctAnswer: String,
+        options: [{ type: String, required: true }],
+        correctAnswer: { type: String, required: true },
       },
     ],
   },

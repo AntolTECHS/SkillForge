@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import axios from "../api/axios";
 
-export const AuthContext = createContext(null); // ✅ now exported
+export const AuthContext = createContext(null);
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
@@ -17,6 +17,9 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
+  /* =========================
+     STATE
+  ========================== */
   const [user, setUser] = useState(() => {
     try {
       const raw = localStorage.getItem("user");
@@ -32,9 +35,9 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [authenticating, setAuthenticating] = useState(false);
 
-  // ==============================
-  // Helper: Attach JWT to Axios
-  // ==============================
+  /* =========================
+     TOKEN HANDLER
+  ========================== */
   const attachTokenToAxios = useCallback(() => {
     const token = localStorage.getItem("token");
     if (token) {
@@ -44,9 +47,9 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // ==============================
-  // Validate session on mount
-  // ==============================
+  /* =========================
+     VALIDATE SESSION ON MOUNT
+  ========================== */
   const validateSession = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -59,12 +62,16 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log("🔹 Validating session...");
       attachTokenToAxios();
+
       const res = await axios.get("/auth/me"); // expects { user }
       const fetchedUser = res.data?.user || res.data;
       console.log("✅ Session valid. User:", fetchedUser);
 
-      setUser(fetchedUser);
-      localStorage.setItem("user", JSON.stringify(fetchedUser));
+      // prevent redundant state updates
+      if (!user?._id || user._id !== fetchedUser._id) {
+        setUser(fetchedUser);
+        localStorage.setItem("user", JSON.stringify(fetchedUser));
+      }
     } catch (err) {
       console.warn("❌ Session validation failed:", err?.response?.data || err.message);
       localStorage.removeItem("token");
@@ -74,8 +81,11 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [attachTokenToAxios]);
+  }, [attachTokenToAxios, user]);
 
+  /* =========================
+     INITIAL EFFECT (fixed)
+  ========================== */
   useEffect(() => {
     const reqInterceptor = axios.interceptors.request.use(
       (config) => {
@@ -99,11 +109,12 @@ export const AuthProvider = ({ children }) => {
     return () => {
       axios.interceptors.request.eject(reqInterceptor);
     };
-  }, [validateSession, user]);
+    // ✅ only depend on validateSession (removed user to prevent infinite loop)
+  }, [validateSession]);
 
-  // ==============================
-  // LOGIN HANDLER
-  // ==============================
+  /* =========================
+     LOGIN HANDLER
+  ========================== */
   const login = async (email, password) => {
     console.log("🪵 LOGIN ATTEMPT:", { email, password });
     setAuthenticating(true);
@@ -144,9 +155,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ==============================
-  // REGISTER HANDLER
-  // ==============================
+  /* =========================
+     REGISTER HANDLER
+  ========================== */
   const register = async (name, email, password, role = "student") => {
     setAuthenticating(true);
     try {
@@ -177,9 +188,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ==============================
-  // LOGOUT
-  // ==============================
+  /* =========================
+     LOGOUT
+  ========================== */
   const logout = async (callServer = false) => {
     try {
       if (callServer) await axios.post("/auth/logout").catch(() => {});
@@ -193,6 +204,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  /* =========================
+     REFRESH USER
+  ========================== */
   const refreshUser = async () => {
     try {
       const res = await axios.get("/auth/me");
@@ -206,6 +220,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  /* =========================
+     CONTEXT VALUE
+  ========================== */
   const value = {
     user,
     loading,

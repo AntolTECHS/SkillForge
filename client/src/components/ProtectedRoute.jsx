@@ -4,13 +4,17 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const Loader = () => (
-  <div className="flex items-center justify-center py-8">
-    <div className="text-sm font-medium text-gray-700">
+  <div className="flex items-center justify-center py-10">
+    <div className="text-sm font-medium text-gray-600 animate-pulse">
       Checking authentication…
     </div>
   </div>
 );
 
+/**
+ * Role-aware route protection.
+ * Supports adminOnly, instructorOnly, or a custom allowedRoles array.
+ */
 const ProtectedRoute = ({
   children,
   adminOnly = false,
@@ -20,31 +24,35 @@ const ProtectedRoute = ({
   const { user, loading, firstLogin } = useAuth();
   const location = useLocation();
 
+  // 🕒 Wait until validation completes
   if (loading) return <Loader />;
 
-  // 🚪 Not logged in → go to login
+  // 🚪 Not logged in → redirect to login
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  const isAdmin = user?.role === "admin" || user?.isAdmin;
-  const isInstructor = user?.role === "instructor";
+  // ✅ Normalize roles
+  const role = user?.role?.toLowerCase?.() || "";
+  const isAdmin = role === "admin" || user?.isAdmin;
+  const isInstructor = role === "instructor";
 
   // 🔒 Role restrictions
   if (adminOnly && !isAdmin) return <Navigate to="/" replace />;
   if (instructorOnly && !isInstructor) return <Navigate to="/" replace />;
 
-  // ✅ Allowed roles array (optional)
+  // ✅ Handle allowedRoles array
   if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
-    const matches = allowedRoles.includes(user?.role);
+    const matches = allowedRoles.some((r) => r.toLowerCase() === role);
     if (!matches) return <Navigate to="/" replace />;
   }
 
-  // 🟠 Redirect instructors on first login to password-change screen
+  // 🟠 Force instructors to change password on first login
   if (isInstructor && firstLogin && location.pathname !== "/change-password") {
     return <Navigate to="/change-password" replace />;
   }
 
+  // ✅ Authorized → render child components
   return <>{children}</>;
 };
 

@@ -1,5 +1,8 @@
 // controllers/courseController.js
-import Course, { Lesson, Module, Quiz } from "../models/Course.js";
+import Course from "../models/Course.js";
+import Lesson from "../models/Lesson.js";
+import Module from "../models/Module.js";
+import Quiz from "../models/Quiz.js";
 import User from "../models/User.js";
 import axios from "axios";
 
