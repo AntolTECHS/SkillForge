@@ -169,13 +169,22 @@ function Card({ children, className = "" }) {
 /* -------------------------
    Minimal InstructorForm component
    ------------------------- */
+
+/* -------------------------
+   InstructorForm (admin can set instructor password)
+   ------------------------- */
 function InstructorForm({ initial = null, onSave, onCancel }) {
   const [form, setForm] = useState({
     name: "",
     email: "",
     bio: "",
     image: "",
+    password: "",
   });
+
+  const [setPassword, setSetPassword] = useState(!initial); // true when creating
+  const [showPassword, setShowPassword] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (initial) {
@@ -184,19 +193,82 @@ function InstructorForm({ initial = null, onSave, onCancel }) {
         email: initial.email || "",
         bio: initial.bio || "",
         image: initial.image || "",
+        password: "",
       });
+      setSetPassword(false);
+    } else {
+      setForm({
+        name: "",
+        email: "",
+        bio: "",
+        image: "",
+        password: "",
+      });
+      setSetPassword(true);
     }
   }, [initial]);
 
-  const handleChange = (e) => setForm((s) => ({ ...s, [e.target.name]: e.target.value }));
+  const handleChange = (e) =>
+    setForm((s) => ({ ...s, [e.target.name]: e.target.value }));
 
-  const handleSubmit = (e) => {
+  const genPassword = (length = 12) => {
+    const chars =
+      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@$%*?";
+    try {
+      const array = new Uint32Array(length);
+      window.crypto.getRandomValues(array);
+      return Array.from(array, (x) => chars[x % chars.length]).join("");
+    } catch {
+      let out = "";
+      for (let i = 0; i < length; i++) {
+        out += chars[Math.floor(Math.random() * chars.length)];
+      }
+      return out;
+    }
+  };
+
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text || "");
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.email) {
-      alert("Name and email required");
+
+    if (!form.name?.trim() || !form.email?.trim()) {
+      alert("Name and email are required.");
       return;
     }
-    onSave && onSave(form);
+
+    if (setPassword) {
+      if (!form.password || form.password.length < 8) {
+        alert("Password is required and must be at least 8 characters.");
+        return;
+      }
+    }
+
+    const payload = {
+      name: form.name.trim(),
+      email: form.email.trim(),
+      bio: form.bio,
+      image: form.image,
+    };
+    if (setPassword && form.password) payload.password = form.password;
+
+    try {
+      setSaving(true);
+      if (onSave) {
+        await onSave(payload);
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err?.message || "Save failed");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -205,30 +277,129 @@ function InstructorForm({ initial = null, onSave, onCancel }) {
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
           <label className="block text-xs text-gray-600">Name</label>
-          <input name="name" value={form.name} onChange={handleChange} className="w-full px-3 py-2 border rounded" />
+          <input
+            name="name"
+            value={form.name}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border rounded"
+          />
         </div>
+
         <div>
           <label className="block text-xs text-gray-600">Email</label>
-          <input name="email" value={form.email} onChange={handleChange} className="w-full px-3 py-2 border rounded" />
+          <input
+            name="email"
+            value={form.email}
+            onChange={handleChange}
+            type="email"
+            className="w-full px-3 py-2 border rounded"
+          />
         </div>
+
         <div>
           <label className="block text-xs text-gray-600">Bio</label>
-          <textarea name="bio" value={form.bio} onChange={handleChange} className="w-full px-3 py-2 border rounded" />
+          <textarea
+            name="bio"
+            value={form.bio}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border rounded"
+          />
         </div>
+
         <div>
           <label className="block text-xs text-gray-600">Image URL</label>
-          <input name="image" value={form.image} onChange={handleChange} className="w-full px-3 py-2 border rounded" />
+          <input
+            name="image"
+            value={form.image}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border rounded"
+          />
+        </div>
+
+        {/* Password controls */}
+        <div className="mt-2">
+          <div className="flex items-center gap-3 mb-2">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={setPassword}
+                onChange={() => setSetPassword((s) => !s)}
+              />
+              <span className="text-sm">{initial ? "Set / Reset password" : "Set password for instructor"}</span>
+            </label>
+
+            {setPassword && (
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const p = genPassword(12);
+                    setForm((s) => ({ ...s, password: p }));
+                    copyToClipboard(p);
+                    // optionally show a small confirmation
+                  }}
+                  className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                >
+                  Generate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(form.password)}
+                  className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                >
+                  Copy
+                </button>
+              </div>
+            )}
+          </div>
+
+          {setPassword && (
+            <div>
+              <label className="block text-xs text-gray-600">Password</label>
+              <input
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                type={showPassword ? "text" : "password"}
+                className="w-full px-3 py-2 border rounded"
+                placeholder="Enter a secure password (min 8 chars)"
+                autoComplete={initial ? "new-password" : "new-password"}
+                aria-describedby="passwordHelp"
+              />
+              <div id="passwordHelp" className="text-xs text-gray-400 mt-1">
+                {form.password ? `${form.password.length} characters` : "Password not set"}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2">
-          <button type="submit" className="px-3 py-1 bg-blue-700 text-white rounded">Save</button>
-          <button type="button" onClick={onCancel} className="px-3 py-1 bg-gray-200 rounded">Cancel</button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-3 py-1 bg-blue-700 text-white rounded"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-3 py-1 bg-gray-200 rounded"
+          >
+            Cancel
+          </button>
         </div>
       </form>
     </Card>
   );
 }
-
 /* -------------------------
    Minimal CertificateGenerator component
    ------------------------- */

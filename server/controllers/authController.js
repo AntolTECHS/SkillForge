@@ -1,3 +1,5 @@
+// server/controllers/authController.js
+import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 import generateToken from "../utils/generateToken.js";
 
@@ -11,14 +13,19 @@ export const registerStudent = async (req, res) => {
     const { name, email, password } = req.body;
     console.log("🪵 REGISTER BODY:", req.body);
 
+    // Check existing user
     const existingUser = await User.findOne({ email });
     if (existingUser)
       return res.status(400).json({ message: "User already exists" });
 
+    // Hash password before saving
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create student
     const user = await User.create({
       name,
       email,
-      password,
+      password: hashedPassword,
       role: "student",
     });
 
@@ -42,25 +49,27 @@ export const registerStudent = async (req, res) => {
  */
 export const loginUser = async (req, res) => {
   try {
-    console.log("🪵 LOGIN BODY:", req.body); // 👈 Debug incoming credentials
+    console.log("🪵 LOGIN BODY:", req.body);
 
     const { email, password } = req.body;
-
     if (!email || !password)
-      return res.status(400).json({ message: "Email and password are required" });
+      return res
+        .status(400)
+        .json({ message: "Email and password are required" });
 
     const user = await User.findOne({ email });
     if (!user)
       return res.status(400).json({ message: "Invalid credentials" });
 
-    const isMatch = await user.matchPassword(password);
+    // Compare password using bcrypt directly (handles both hashed and pre-hashed)
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res.status(400).json({ message: "Invalid credentials" });
 
     if (!user.isActive)
       return res.status(403).json({ message: "Account is deactivated" });
 
-    // 🔹 Check if instructor must change password on first login
+    // 🔹 First login for instructor
     if (user.role === "instructor" && user.isFirstLogin) {
       return res.status(200).json({
         message: "First login, please change your password",
@@ -71,7 +80,7 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // ✅ Normal login success
+    // ✅ Successful login
     res.status(200).json({
       _id: user._id,
       name: user.name,
@@ -86,7 +95,7 @@ export const loginUser = async (req, res) => {
 };
 
 /**
- * @desc    Change Password (first-time instructor or profile update)
+ * @desc    Change Password (for first-time instructor or user update)
  * @route   PUT /api/auth/change-password
  * @access  Private
  */
@@ -100,12 +109,13 @@ export const changePassword = async (req, res) => {
     if (!user)
       return res.status(404).json({ message: "User not found" });
 
-    const isMatch = await user.matchPassword(currentPassword);
+    // Validate current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch)
       return res.status(400).json({ message: "Current password is incorrect" });
 
-    // ✅ Update new password
-    user.password = newPassword;
+    // ✅ Hash new password
+    user.password = await bcrypt.hash(newPassword, 10);
     user.isFirstLogin = false;
 
     await user.save();
