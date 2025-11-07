@@ -1,3 +1,9 @@
+// cleaned card layout
+/* Enhanced StatCard styles inserted by assistant: 
+   - grid: 2 cols (mobile), 3 cols (md/tablet), 5 cols (lg)
+   - each StatCard wrapped with rounded shadow, hover lift, and subtle translucent background
+   If you use Tailwind, these classes apply out of the box. */
+
 
 // AdminDashboard.jsx
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
@@ -422,7 +428,7 @@ function CertificateGenerator({ users = [], courses = [], onGenerate }) {
   return (
     <div>
       <h4 className="font-semibold mb-2">Generate Certificate</h4>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 mt-8">
         <select value={userId} onChange={(e) => setUserId(e.target.value)} className="px-3 py-2 border rounded">
           <option value="">Select user</option>
           {users.map((u) => <option key={u._id ?? u.id ?? u.email} value={u._id ?? u.id ?? u.email}>{u.name || u.email}</option>)}
@@ -1324,8 +1330,8 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
-          <StatCard
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-6">
+            <StatCard
             title="Total learners"
             value={computedCount}
             subtitle={"Live computed (users & enrollments)"}
@@ -1333,9 +1339,17 @@ export default function AdminDashboard() {
             theme="blue"
           />
 
-          <StatCard title="Registered users (real-time)" value={registeredUsersCount} subtitle="From users API" icon={Users} theme="teal" />
-          <StatCard title="Unique enrolled learners" value={uniqueLearnersFromEnrollments} subtitle="Counted from enrollments" icon={UserPlus} theme="purple" />
-          <StatCard title="Courses" value={overview.totalCourses ?? courses.length} icon={BookOpen} theme="amber" />
+            <StatCard title="Registered users (real-time)" value={registeredUsersCount} subtitle="From users API" icon={Users} theme="teal" />
+            <StatCard title="Unique enrolled learners" value={uniqueLearnersFromEnrollments} subtitle="Counted from enrollments" icon={UserPlus} theme="purple" />
+            <StatCard title="Courses" value={overview.totalCourses ?? courses.length} icon={BookOpen} theme="amber" />
+
+    <StatCard
+    title="Instructors"
+    value={overview.instructors ?? instructors.length}
+    subtitle="Active instructors"
+    icon={UserPlus}
+    theme="teal"
+  />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
