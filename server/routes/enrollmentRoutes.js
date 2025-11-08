@@ -1,37 +1,32 @@
+// server/routes/enrollmentRoutes.js
+
 import express from "express";
-import User from "../models/User.js";
-import Course from "../models/Course.js";
-import { protect } from "../middleware/authMiddleware.js";
+import Enrollment from "../models/Enrollment.js";
+import { protect } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// Enroll in a course (starts 21-day trial)
-router.post("/:courseId", protect, async (req, res) => {
+/**
+ * @desc Get all enrollments (public/instructor use)
+ * @route GET /api/enrollments
+ * @access Protected (students/instructors/admin)
+ */
+router.get("/", protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    const { courseId } = req.params;
+    const limit = parseInt(req.query.limit) || 100;
+    const skip = parseInt(req.query.skip) || 0;
 
-    // Check if course exists
-    const course = await Course.findById(courseId);
-    if (!course) return res.status(404).json({ message: "Course not found" });
+    const enrollments = await Enrollment.find()
+      .populate("user", "name email role")
+      .populate("course", "title category")
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
 
-    // Prevent duplicate enrollment
-    const already = user.enrolledCourses.find(
-      (c) => c.course.toString() === courseId
-    );
-    if (already)
-      return res.status(400).json({ message: "Already enrolled in this course" });
-
-    // Add course with 21-day trial
-    user.addCourseEnrollment(courseId);
-    await user.save();
-
-    res.status(201).json({
-      message: "Enrolled successfully. You have 21 days of free access.",
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.json({ total: enrollments.length, enrollments });
+  } catch (error) {
+    console.error("❌ Error fetching enrollments:", error.message);
+    res.status(500).json({ message: "Server error while fetching enrollments" });
   }
 });
 

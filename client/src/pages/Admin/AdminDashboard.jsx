@@ -781,15 +781,39 @@ export default function AdminDashboard() {
     async (form) => {
       try {
         if (editingInstructor && editingInstructor._id) {
-          await axios.put(`/admin/instructors/${editingInstructor._id}`, form).catch(() => axios.put(`/instructors/${editingInstructor._id}`, form));
+          // Update path: try admin first, fallback only on network/404.
+          try {
+            await axios.put(`/admin/instructors/${editingInstructor._id}`, form);
+          } catch (err) {
+            const status = err?.response?.status;
+            if (!err.response || status === 404) {
+              // Try the public endpoint as a fallback (server might mount admin routes differently)
+              await axios.put(`/instructors/${editingInstructor._id}`, form);
+            } else {
+              // Validation/auth errors (400/401/403) should be surfaced, do not retry.
+              throw err;
+            }
+          }
           setEditingInstructor(null);
         } else {
-          await axios.post("/admin/instructors", form).catch(() => axios.post("/instructors", form));
+          // Create path: try admin endpoint first, fallback only on network/404.
+          try {
+            await axios.post("/admin/instructors", form);
+          } catch (err) {
+            const status = err?.response?.status;
+            if (!err.response || status === 404) {
+              await axios.post("/instructors", form);
+            } else {
+              // For 400/401/403/etc - do not retry. Surface to caller.
+              throw err;
+            }
+          }
         }
         await fetchAllData();
         setActiveTab("Instructors");
       } catch (err) {
-        alert(err.response?.data?.message || "Error saving instructor");
+        // Show the most informative message available
+        alert(err?.response?.data?.message || err?.message || "Error saving instructor");
       }
     },
     [editingInstructor, fetchAllData]

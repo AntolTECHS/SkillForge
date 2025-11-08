@@ -12,6 +12,7 @@ const router = express.Router();
 /* =========================================================
    🔒 Middleware Protection
    ========================================================= */
+// All admin routes are protected and require admin role
 router.use(protect, authorizeRoles("admin"));
 
 /* =========================================================
@@ -44,6 +45,13 @@ router.get("/payments", adminController.getAllPayments);
 router.get("/certificates", adminController.getAllCertificates);
 
 /* =========================================================
+   🧾 Enrollments, Attendance & Assignments
+   ========================================================= */
+router.get("/enrollments", adminController.getAllEnrollments);
+router.get("/attendance", adminController.getAllAttendance);
+router.get("/assignments", adminController.getAllAssignments);
+
+/* =========================================================
    📊 Dashboard Overview
    ========================================================= */
 router.get("/overview", adminController.getOverview);
@@ -52,25 +60,28 @@ router.get("/overview", adminController.getOverview);
    🖼 File Upload (Optional)
    ========================================================= */
 const uploadDir = path.join(process.cwd(), "uploads");
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    const unique =
+    const uniqueName =
       Date.now() + "-" + Math.round(Math.random() * 1e9) + "-" + file.originalname;
-    cb(null, unique);
+    cb(null, uniqueName);
   },
 });
+
 const upload = multer({ storage });
 
 router.post("/upload", upload.single("file"), (req, res) => {
-  if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+  if (!req.file)
+    return res.status(400).json({ message: "No file uploaded" });
 
   const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
   console.log("✅ File uploaded:", req.file.filename);
 
-  return res.json({ url: fileUrl });
+  res.json({ url: fileUrl });
 });
 
 /* =========================================================
