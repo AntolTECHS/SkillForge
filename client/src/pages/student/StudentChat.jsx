@@ -96,12 +96,12 @@ export default function StudentChat() {
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-gray-100 text-gray-900">
+    <div className="flex min-h-screen w-full text-gray-900">
       {/* SIDEBAR */}
       <Sidebar />
 
       {/* CHAT SECTION */}
-      <div className="flex-1 flex flex-col bg-gray-100 relative lg:ml-64">
+      <div className="flex-1 flex flex-col relative lg:ml-64">
         {/* CHAT CONTENT */}
         <main className="flex-1 overflow-y-auto w-full py-6">
           <div className="flex flex-col gap-4 w-full px-4 sm:px-6 lg:px-0">
@@ -119,7 +119,6 @@ export default function StudentChat() {
                         ? "bg-blue-100 text-blue-900 max-w-[60%] lg:mr-10"
                         : "bg-gray-200 text-gray-900 border border-gray-300 w-full sm:max-w-[60%]"
                     }`}
-                  // No additional inline styles needed
                 >
                   {msg.text}
                 </div>
@@ -137,7 +136,7 @@ export default function StudentChat() {
         </main>
 
         {/* INPUT BAR */}
-        <div className="sticky bottom-0 flex justify-start bg-gray-100 py-4 border-t border-gray-300 px-4 sm:px-6 lg:px-0">
+        <div className="sticky bottom-0 flex justify-start py-4 border-t border-gray-300 px-4 sm:px-6 lg:px-0 bg-inherit">
           <div className="flex items-center bg-white rounded-2xl border border-gray-300 shadow-md overflow-hidden w-full max-w-7xl mx-auto">
             <input
               type="text"

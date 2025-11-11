@@ -3,8 +3,11 @@ import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
+/**
+ * Loader shown while authentication/session is being validated
+ */
 const Loader = () => (
-  <div className="flex items-center justify-center py-10">
+  <div className="flex items-center justify-center min-h-screen">
     <div className="text-sm font-medium text-gray-600 animate-pulse">
       Checking authentication…
     </div>
@@ -12,8 +15,11 @@ const Loader = () => (
 );
 
 /**
- * Role-aware route protection.
- * Supports adminOnly, instructorOnly, or a custom allowedRoles array.
+ * ProtectedRoute component
+ * @param {ReactNode} children - Component(s) to render if authorized
+ * @param {boolean} adminOnly - Only allow admin users
+ * @param {boolean} instructorOnly - Only allow instructor users
+ * @param {Array} allowedRoles - Array of allowed roles (overrides adminOnly/instructorOnly if provided)
  */
 const ProtectedRoute = ({
   children,
@@ -24,35 +30,38 @@ const ProtectedRoute = ({
   const { user, loading, firstLogin } = useAuth();
   const location = useLocation();
 
-  // 🕒 Wait until validation completes
+  // Show loader while auth is validating
   if (loading) return <Loader />;
 
-  // 🚪 Not logged in → redirect to login
+  // Not logged in → redirect to login page
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // ✅ Normalize roles
-  const role = user?.role?.toLowerCase?.() || "";
-  const isAdmin = role === "admin" || user?.isAdmin;
+  const role = user?.role?.toLowerCase() || "";
+
+  // Handle role restrictions
+  const isAdmin = role === "admin";
   const isInstructor = role === "instructor";
 
-  // 🔒 Role restrictions
+  // Admin only
   if (adminOnly && !isAdmin) return <Navigate to="/" replace />;
+
+  // Instructor only
   if (instructorOnly && !isInstructor) return <Navigate to="/" replace />;
 
-  // ✅ Handle allowedRoles array
+  // Custom allowedRoles array
   if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
-    const matches = allowedRoles.some((r) => r.toLowerCase() === role);
-    if (!matches) return <Navigate to="/" replace />;
+    const normalizedRoles = allowedRoles.map((r) => r.toLowerCase());
+    if (!normalizedRoles.includes(role)) return <Navigate to="/" replace />;
   }
 
-  // 🟠 Force instructors to change password on first login
-  if (isInstructor && firstLogin && location.pathname !== "/change-password") {
-    return <Navigate to="/change-password" replace />;
+  // Force instructors with firstLogin = true to change-password page
+  if (isInstructor && firstLogin && location.pathname !== "/instructor/change-password") {
+    return <Navigate to="/instructor/change-password" replace />;
   }
 
-  // ✅ Authorized → render child components
+  // Authorized → render children
   return <>{children}</>;
 };
 

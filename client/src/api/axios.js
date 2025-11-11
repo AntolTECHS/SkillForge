@@ -1,17 +1,13 @@
 // src/api/axios.js
 // Robust axios instance for SkillForge frontend
-// - Resolves a sensible API base from VITE_API_BASE_URL (supports many formats)
-// - Defaults to http://localhost:5000/api when nothing provided
-// - Attaches token from localStorage if present
-// - Attempts cookie-based refresh first (withCredentials) then body-based refresh
-// - Includes helpful debug logs (disable in production)
+// Handles API base URL, token attachment, refresh logic, and debug logs
 
 import axios from "axios";
 
 function resolveApiBase() {
   const raw = (import.meta.env?.VITE_API_BASE_URL || "").toString().trim();
 
-  if (!raw) return "http://localhost:5000/api";
+  if (!raw) return "http://localhost:5000/api"; // default base
 
   // Absolute URL
   if (/^https?:\/\//i.test(raw)) return raw.replace(/\/$/, "");
@@ -35,25 +31,29 @@ function resolveApiBase() {
   return raw.replace(/\/$/, "");
 }
 
+// API base URL
 const API_BASE_URL = resolveApiBase();
+
+// use cookies for refresh by default
 const USE_CREDENTIALS = (import.meta.env?.VITE_API_USE_COOKIES || "true") === "true";
 
+// -----------------
 // Create axios instance
+// -----------------
 const axiosInstance = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE_URL, // do NOT add extra /api here
   headers: { "Content-Type": "application/json" },
-  // If your backend uses httpOnly cookie refresh flow, set withCredentials true.
-  // If you rely on bearer tokens only, this can be false — but leaving true is usually safe.
   withCredentials: USE_CREDENTIALS,
 });
 
-// Debug: show baseURL in console (remove or guard this in production)
+// Debug: show baseURL in console
 if (import.meta.env.DEV) {
-  // eslint-disable-next-line no-console
   console.info("[axios] baseURL =", axiosInstance.defaults.baseURL, "| withCredentials =", axiosInstance.defaults.withCredentials);
 }
 
-/* ---------- request interceptor: attach token (if any) ---------- */
+// -----------------
+// Request interceptor: attach token
+// -----------------
 axiosInstance.interceptors.request.use(
   (config) => {
     try {
@@ -62,15 +62,15 @@ axiosInstance.interceptors.request.use(
         config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${token}`;
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
     return config;
   },
   (err) => Promise.reject(err)
 );
 
-/* ---------- refresh logic on 401 with queue ---------- */
+// -----------------
+// Response interceptor: refresh token logic
+// -----------------
 let isRefreshing = false;
 let refreshQueue = [];
 
@@ -87,18 +87,10 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (!error.response) {
-      // network error
-      return Promise.reject(error);
-    }
+    if (!error.response) return Promise.reject(error); // network error
+    if (error.response.status !== 401) return Promise.reject(error);
 
-    // Only handle 401 here
-    if (error.response.status !== 401) {
-      return Promise.reject(error);
-    }
-
-    // prevent retry loops
-    if (originalRequest && originalRequest._retry) {
+    if (originalRequest?._retry) {
       // second failure: clear auth and redirect
       try {
         localStorage.removeItem("token");
@@ -127,19 +119,22 @@ axiosInstance.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      // First try cookie-based refresh (server should read httpOnly cookie)
       let refreshRes;
       try {
+        // cookie-based refresh
         refreshRes = await axios.post(
           `${API_BASE_URL.replace(/\/api$/, "")}/auth/refresh`,
           {},
           { withCredentials: true }
         );
       } catch (cookieErr) {
-        // fallback to body-based refresh if refreshToken is in localStorage
+        // fallback to body-based refresh
         const storedRefresh = localStorage.getItem("refreshToken");
         if (storedRefresh) {
-          refreshRes = await axios.post(`${API_BASE_URL.replace(/\/api$/, "")}/auth/refresh`, { refreshToken: storedRefresh });
+          refreshRes = await axios.post(
+            `${API_BASE_URL.replace(/\/api$/, "")}/auth/refresh`,
+            { refreshToken: storedRefresh }
+          );
         } else {
           throw cookieErr;
         }
@@ -178,16 +173,16 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-/* optional: lightweight response logger for dev */
+// -----------------
+// Optional: lightweight response logger for dev
+// -----------------
 if (import.meta.env.DEV) {
   axiosInstance.interceptors.response.use(
     (res) => {
-      // eslint-disable-next-line no-console
       console.debug("[axios res]", res.status, res.config?.url);
       return res;
     },
     (err) => {
-      // eslint-disable-next-line no-console
       if (err?.response) console.warn("[axios err]", err.response.status, err.config?.url);
       return Promise.reject(err);
     }

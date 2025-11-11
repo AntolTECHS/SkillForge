@@ -1,11 +1,5 @@
 // src/context/AuthContext.jsx
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-} from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import axios from "../api/axios";
 
 export const AuthContext = createContext(null);
@@ -17,9 +11,6 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  /* =========================
-     STATE
-  ========================== */
   const [user, setUser] = useState(() => {
     try {
       const raw = localStorage.getItem("user");
@@ -29,63 +20,53 @@ export const AuthProvider = ({ children }) => {
     }
   });
 
-  const [firstLogin, setFirstLogin] = useState(
-    localStorage.getItem("firstLogin") === "true"
-  );
+  const [firstLogin, setFirstLogin] = useState(localStorage.getItem("firstLogin") === "true");
   const [loading, setLoading] = useState(true);
   const [authenticating, setAuthenticating] = useState(false);
 
-  /* =========================
-     TOKEN HANDLER
-  ========================== */
+  // Attach token to axios headers
   const attachTokenToAxios = useCallback(() => {
     const token = localStorage.getItem("token");
-    if (token) {
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    } else {
-      delete axios.defaults.headers.common["Authorization"];
-    }
+    if (token) axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    else delete axios.defaults.headers.common["Authorization"];
   }, []);
 
-  /* =========================
-     VALIDATE SESSION ON MOUNT
-  ========================== */
+  // Validate session on mount
   const validateSession = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
-      console.log("🔸 No token found — skipping session validation");
       setUser(null);
       setLoading(false);
       return;
     }
 
     try {
-      console.log("🔹 Validating session...");
       attachTokenToAxios();
-
-      const res = await axios.get("/auth/me"); // expects { user }
+      const res = await axios.get("/auth/me");
       const fetchedUser = res.data?.user || res.data;
-      console.log("✅ Session valid. User:", fetchedUser);
 
-      // prevent redundant state updates
-      if (!user?._id || user._id !== fetchedUser._id) {
-        setUser(fetchedUser);
-        localStorage.setItem("user", JSON.stringify(fetchedUser));
+      setUser(fetchedUser);
+      localStorage.setItem("user", JSON.stringify(fetchedUser));
+
+      if (fetchedUser.role === "instructor" && fetchedUser.isFirstLogin) {
+        setFirstLogin(true);
+        localStorage.setItem("firstLogin", "true");
+      } else {
+        setFirstLogin(false);
+        localStorage.removeItem("firstLogin");
       }
-    } catch (err) {
-      console.warn("❌ Session validation failed:", err?.response?.data || err.message);
+    } catch {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
+      localStorage.removeItem("firstLogin");
       delete axios.defaults.headers.common["Authorization"];
       setUser(null);
+      setFirstLogin(false);
     } finally {
       setLoading(false);
     }
-  }, [attachTokenToAxios, user]);
+  }, [attachTokenToAxios]);
 
-  /* =========================
-     INITIAL EFFECT (fixed)
-  ========================== */
   useEffect(() => {
     const reqInterceptor = axios.interceptors.request.use(
       (config) => {
@@ -96,42 +77,36 @@ export const AuthProvider = ({ children }) => {
       (err) => Promise.reject(err)
     );
 
-    const token = localStorage.getItem("token");
-
-    if (token && !user) {
-      console.log("🟢 Found token, validating session...");
+    if (localStorage.getItem("token") && !user) {
       validateSession();
     } else {
-      console.log("🟠 No need to validate — user already set or no token.");
       setLoading(false);
     }
 
-    return () => {
-      axios.interceptors.request.eject(reqInterceptor);
-    };
-    // ✅ only depend on validateSession (removed user to prevent infinite loop)
-  }, [validateSession]);
+    return () => axios.interceptors.request.eject(reqInterceptor);
+  }, [validateSession, user]);
 
-  /* =========================
-     LOGIN HANDLER
-  ========================== */
-  const login = async (email, password) => {
-    console.log("🪵 LOGIN ATTEMPT:", { email, password });
+  // LOGIN
+  const login = async (email, password, options = {}) => {
     setAuthenticating(true);
-
     try {
-      const res = await axios.post("/auth/login", { email, password });
-      console.log("✅ LOGIN SUCCESS:", res.data);
+      if (!email || !password) throw new Error("Email and password are required");
 
-      const token = res.data?.token || res.data?.accessToken;
-      const returnedUser = res.data?.user || res.data;
+      const payload = { email, password };
+      if (options.temp) payload.temp = true; // for temporary password login
 
+      const res = await axios.post("/auth/login", payload);
+      const token = res.data.token || res.data.accessToken;
       if (!token) throw new Error("No token returned from login");
 
       localStorage.setItem("token", token);
       attachTokenToAxios();
 
-      if (res.data.firstLogin) {
+      const returnedUser = res.data.user || res.data;
+      setUser(returnedUser);
+      localStorage.setItem("user", JSON.stringify(returnedUser));
+
+      if (res.data.forcePasswordChange || returnedUser.isFirstLogin) {
         setFirstLogin(true);
         localStorage.setItem("firstLogin", "true");
       } else {
@@ -139,37 +114,24 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem("firstLogin");
       }
 
-      if (returnedUser && returnedUser.role) {
-        setUser(returnedUser);
-        localStorage.setItem("user", JSON.stringify(returnedUser));
-      } else {
-        await validateSession();
-      }
-
       return res.data;
     } catch (err) {
-      console.error("❌ LOGIN FAILED:", err.response?.data || err.message);
-      throw err;
+      const msg =
+        err.response?.data?.message || err.message || "Login failed. Please check credentials.";
+      throw { response: { data: { message: msg } } };
     } finally {
       setAuthenticating(false);
     }
   };
 
-  /* =========================
-     REGISTER HANDLER
-  ========================== */
+  // REGISTER (students only)
   const register = async (name, email, password, role = "student") => {
     setAuthenticating(true);
     try {
-      const res = await axios.post("/auth/register", {
-        name,
-        email,
-        password,
-        role,
-      });
-
-      const token = res.data?.token || res.data?.accessToken;
-      const returnedUser = res.data?.user || res.data;
+      if (!name || !email || !password) throw new Error("All fields are required");
+      const res = await axios.post("/auth/register", { name, email, password, role });
+      const token = res.data.token || res.data.accessToken;
+      const returnedUser = res.data.user || res.data;
 
       if (!token) throw new Error("No token returned from register");
 
@@ -181,16 +143,15 @@ export const AuthProvider = ({ children }) => {
 
       return res.data;
     } catch (err) {
-      console.error("❌ REGISTER FAILED:", err.response?.data || err.message);
-      throw err;
+      const msg =
+        err.response?.data?.message || err.message || "Registration failed. Please try again.";
+      throw { response: { data: { message: msg } } };
     } finally {
       setAuthenticating(false);
     }
   };
 
-  /* =========================
-     LOGOUT
-  ========================== */
+  // LOGOUT
   const logout = async (callServer = false) => {
     try {
       if (callServer) await axios.post("/auth/logout").catch(() => {});
@@ -204,36 +165,44 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  /* =========================
-     REFRESH USER
-  ========================== */
+  // REFRESH USER
   const refreshUser = async () => {
     try {
       const res = await axios.get("/auth/me");
       const fetchedUser = res.data?.user || res.data;
       setUser(fetchedUser);
       localStorage.setItem("user", JSON.stringify(fetchedUser));
+
+      if (fetchedUser.role === "instructor" && fetchedUser.isFirstLogin) {
+        setFirstLogin(true);
+        localStorage.setItem("firstLogin", "true");
+      } else {
+        setFirstLogin(false);
+        localStorage.removeItem("firstLogin");
+      }
+
       return fetchedUser;
-    } catch (err) {
-      console.warn("⚠️ Failed to refresh user:", err);
+    } catch {
       return null;
     }
   };
 
-  /* =========================
-     CONTEXT VALUE
-  ========================== */
-  const value = {
-    user,
-    loading,
-    authenticating,
-    isAuthenticated: !!user,
-    login,
-    register,
-    logout,
-    refreshUser,
-    setUser,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        authenticating,
+        isAuthenticated: !!user,
+        firstLogin,
+        login,
+        register,
+        logout,
+        refreshUser,
+        setUser,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };

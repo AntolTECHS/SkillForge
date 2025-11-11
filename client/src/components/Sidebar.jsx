@@ -1,14 +1,15 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
-import { Home, BookOpen, MessageSquare, Award, FileBadge, Users } from "lucide-react";
+import { Home, BookOpen, MessageSquare, Award, FileBadge, Users, UserPlus } from "lucide-react";
 
 const Sidebar = () => {
   const { isSidebarOpen, closeSidebar } = useSidebar();
-  const { user, logout } = useAuth();
+  const { user, logout, firstLogin } = useAuth();
   const navigate = useNavigate();
 
-  const mainMenu = [
+  // Define menu items per role
+  const studentMenu = [
     { name: "Dashboard", icon: <Home size={20} />, path: "/student/dashboard" },
     { name: "Courses", icon: <BookOpen size={20} />, path: "/student/courses" },
     { name: "Chat with AI", icon: <MessageSquare size={20} />, path: "/student/chat" },
@@ -16,6 +17,23 @@ const Sidebar = () => {
     { name: "Certificates", icon: <FileBadge size={20} />, path: "/student/certificates" },
     { name: "XP & Rewards", icon: <Award size={20} />, path: "/student/rewards" },
   ];
+
+  const instructorMenu = [
+    { name: "Dashboard", icon: <Home size={20} />, path: "/instructor" },
+    !firstLogin && { name: "Create Course", icon: <BookOpen size={20} />, path: "/instructor/create-course" },
+  ].filter(Boolean); // remove false entries when firstLogin=true
+
+  const adminMenu = [
+    { name: "Dashboard", icon: <Home size={20} />, path: "/admin" },
+    { name: "Courses", icon: <BookOpen size={20} />, path: "/admin/courses" },
+    { name: "Instructors", icon: <UserPlus size={20} />, path: "/admin/instructors" },
+  ];
+
+  // Select menu based on role
+  let mainMenu = [];
+  if (user?.role === "student") mainMenu = studentMenu;
+  else if (user?.role === "instructor") mainMenu = instructorMenu;
+  else if (user?.role === "admin") mainMenu = adminMenu;
 
   const handleProfileClick = () => {
     closeSidebar();
@@ -41,16 +59,12 @@ const Sidebar = () => {
           lg:translate-x-0
         `}
       >
-        {/* Main wrapper — pushes footer to the bottom */}
         <div
           className="flex flex-col justify-between h-full overflow-hidden"
           style={{ paddingTop: "var(--navbar-height, 56px)" }}
         >
           {/* NAVIGATION */}
           <div>
-            {/* --- Removed the mobile-only close row so the Navbar toggle (hamburger/X) is the single control --- */}
-
-            {/* nav links area */}
             <nav className="p-4 mt-2 space-y-1 overflow-y-auto">
               {mainMenu.map((item) => (
                 <NavLink

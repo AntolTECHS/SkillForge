@@ -52,7 +52,7 @@ function AppLayout() {
     location.pathname.startsWith("/student") ||
     location.pathname.startsWith("/instructor");
 
-  // Determine redirect after login
+  // Determine default redirect after login
   const defaultRedirect = user?.role === "instructor"
     ? "/instructor"
     : user?.role === "admin"
@@ -82,7 +82,7 @@ function AppLayout() {
 
         {/* ==================== STUDENT ROUTES ==================== */}
         <Route
-          path="/student"
+          path="/student/*"
           element={
             <ProtectedRoute allowedRoles={["student"]}>
               <StudentLayout />
@@ -102,7 +102,7 @@ function AppLayout() {
         <Route
           path="/instructor"
           element={
-            <ProtectedRoute allowedRoles={["instructor"]}>
+            <ProtectedRoute instructorOnly>
               <InstructorDashboard />
             </ProtectedRoute>
           }
@@ -110,7 +110,7 @@ function AppLayout() {
         <Route
           path="/instructor/create-course"
           element={
-            <ProtectedRoute allowedRoles={["instructor"]}>
+            <ProtectedRoute instructorOnly>
               <CreateCourse />
             </ProtectedRoute>
           }
@@ -118,7 +118,7 @@ function AppLayout() {
         <Route
           path="/instructor/change-password"
           element={
-            <ProtectedRoute allowedRoles={["instructor"]}>
+            <ProtectedRoute instructorOnly>
               <ChangePassword />
             </ProtectedRoute>
           }
@@ -128,7 +128,7 @@ function AppLayout() {
         <Route
           path="/admin"
           element={
-            <ProtectedRoute allowedRoles={["admin"]}>
+            <ProtectedRoute adminOnly>
               <AdminDashboard />
             </ProtectedRoute>
           }
@@ -136,7 +136,7 @@ function AppLayout() {
         <Route
           path="/admin/courses"
           element={
-            <ProtectedRoute allowedRoles={["admin"]}>
+            <ProtectedRoute adminOnly>
               <AdminCourses />
             </ProtectedRoute>
           }
@@ -144,7 +144,7 @@ function AppLayout() {
         <Route
           path="/admin/instructors"
           element={
-            <ProtectedRoute allowedRoles={["admin"]}>
+            <ProtectedRoute adminOnly>
               <AdminInstructors />
             </ProtectedRoute>
           }

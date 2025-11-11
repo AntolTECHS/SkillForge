@@ -1,4 +1,3 @@
-// src/pages/student/Community.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import Navbar from "../../components/Navbar";
@@ -38,7 +37,6 @@ function NewPostForm({ onCreate }) {
           { headers: { "Content-Type": "multipart/form-data" } }
         );
 
-        // prepend backend URL to display image correctly
         imageUrl = `http://localhost:5000${res.data.url}`;
       } catch (err) {
         console.error("Image upload failed:", err);
@@ -109,15 +107,22 @@ function PostCard({ post, onLike, onComment }) {
     <article className="bg-white rounded-2xl shadow border border-blue-100 p-4">
       <div className="flex gap-3">
         <img
-          src={post.author?.avatar || "https://cdn-icons-png.flaticon.com/512/194/194938.png"}
+          src={
+            post.author?.avatar ||
+            "https://cdn-icons-png.flaticon.com/512/194/194938.png"
+          }
           alt={post.author?.name || "User"}
           className="w-10 h-10 rounded-full object-cover"
         />
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
             <div>
-              <div className="font-semibold text-gray-800">{post.author?.name || "Anonymous"}</div>
-              <div className="text-xs text-gray-400">{new Date(post.createdAt).toLocaleString()}</div>
+              <div className="font-semibold text-gray-800">
+                {post.author?.name || "Anonymous"}
+              </div>
+              <div className="text-xs text-gray-400">
+                {new Date(post.createdAt).toLocaleString()}
+              </div>
             </div>
             <div className="text-sm text-gray-500">
               {post.likes || 0} <Heart className="inline-block ml-2" size={14} />
@@ -128,7 +133,11 @@ function PostCard({ post, onLike, onComment }) {
 
           {post.image && (
             <div className="mt-3 rounded-lg overflow-hidden border">
-              <img src={post.image} alt="post" className="w-full h-56 object-cover" />
+              <img
+                src={post.image}
+                alt="post"
+                className="w-full h-56 object-cover"
+              />
             </div>
           )}
 
@@ -149,19 +158,26 @@ function PostCard({ post, onLike, onComment }) {
 
           {showComments && (
             <div className="mt-3 border-t pt-3">
-              {(Array.isArray(post.comments) ? post.comments : []).map((c, idx) => (
-                <div key={idx} className="flex gap-3 items-start">
-                  <img
-                    src={c.author?.avatar || "https://cdn-icons-png.flaticon.com/512/194/194938.png"}
-                    alt={c.author?.name || "User"}
-                    className="w-8 h-8 rounded-full object-cover"
-                  />
-                  <div className="bg-gray-50 p-2 rounded-lg">
-                    <div className="text-sm font-medium">{c.author?.name || "User"}</div>
-                    <div className="text-xs text-gray-600">{c.text}</div>
+              {(Array.isArray(post.comments) ? post.comments : []).map(
+                (c, idx) => (
+                  <div key={idx} className="flex gap-3 items-start">
+                    <img
+                      src={
+                        c.author?.avatar ||
+                        "https://cdn-icons-png.flaticon.com/512/194/194938.png"
+                      }
+                      alt={c.author?.name || "User"}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                    <div className="bg-gray-50 p-2 rounded-lg">
+                      <div className="text-sm font-medium">
+                        {c.author?.name || "User"}
+                      </div>
+                      <div className="text-xs text-gray-600">{c.text}</div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              )}
               <form onSubmit={handleComment} className="mt-3 flex gap-2 items-start">
                 <input
                   value={commentText}
@@ -169,7 +185,9 @@ function PostCard({ post, onLike, onComment }) {
                   placeholder="Write a comment..."
                   className="flex-1 px-3 py-2 border rounded-md"
                 />
-                <button className="px-3 py-2 bg-sky-500 text-white rounded-md">Reply</button>
+                <button className="px-3 py-2 bg-sky-500 text-white rounded-md">
+                  Reply
+                </button>
               </form>
             </div>
           )}
@@ -187,7 +205,7 @@ export default function CommunityPage() {
   const [posts, setPosts] = useState([]);
   const [query, setQuery] = useState("");
   const [calendarDate, setCalendarDate] = useState(new Date());
-  const [showCalendar, setShowCalendar] = useState(false); // mobile toggle
+  const [showCalendar, setShowCalendar] = useState(false);
 
   const fetchPosts = async () => {
     try {
@@ -201,7 +219,9 @@ export default function CommunityPage() {
     }
   };
 
-  useEffect(() => { fetchPosts(); }, []);
+  useEffect(() => {
+    fetchPosts();
+  }, []);
 
   const handleCreatePost = async (newPost) => {
     if (!user) return alert("User not logged in.");
@@ -225,8 +245,13 @@ export default function CommunityPage() {
         {},
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
-      const updatedPost = { ...posts.find(p => p._id === postId), likes: res.data.likes };
-      setPosts((prev) => prev.map((p) => (p._id === postId ? updatedPost : p)));
+      const updatedPost = {
+        ...posts.find((p) => p._id === postId),
+        likes: res.data.likes,
+      };
+      setPosts((prev) =>
+        prev.map((p) => (p._id === postId ? updatedPost : p))
+      );
     } catch (err) {
       console.error("Failed to like post:", err);
     }
@@ -240,7 +265,9 @@ export default function CommunityPage() {
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
       const updatedPost = res.data;
-      setPosts((prev) => prev.map((p) => (p._id === postId ? updatedPost : p)));
+      setPosts((prev) =>
+        prev.map((p) => (p._id === postId ? updatedPost : p))
+      );
     } catch (err) {
       console.error("Failed to comment:", err);
     }
@@ -250,40 +277,42 @@ export default function CommunityPage() {
     const q = (query || "").trim().toLowerCase();
     if (!q) return posts;
     return posts.filter(
-      (p) => (p.text || "").toLowerCase().includes(q) ||
-             (p.author?.name || "").toLowerCase().includes(q)
+      (p) =>
+        (p.text || "").toLowerCase().includes(q) ||
+        (p.author?.name || "").toLowerCase().includes(q)
     );
   }, [posts, query]);
 
   return (
-    <div className="min-h-screen bg-blue-50 font-sans">
-      <Navbar />
-      <main className="pt-6 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row gap-6">
-
+    <div className="min-h-screen font-sans overflow-x-hidden">
+      <main className="pt-6 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row flex-wrap gap-6 overflow-hidden">
         {/* Left feed */}
-        <section className="flex-1 space-y-4">
-          {/* Title */}
+        <section className="flex-1 min-w-0 space-y-4">
           <h1 className="text-2xl font-bold text-center whitespace-nowrap">
             SkillForge Community
           </h1>
 
-          {/* Mobile toggle buttons below title */}
+          {/* Mobile toggle buttons */}
           <div className="flex gap-6 mt-2 mb-4 lg:hidden justify-center">
             <button
               onClick={() => setShowCalendar(false)}
-              className={`px-3 py-1 rounded ${!showCalendar ? "bg-sky-500 text-white" : ""}`}
+              className={`px-3 py-1 rounded ${
+                !showCalendar ? "bg-sky-500 text-white" : ""
+              }`}
             >
               Posts
             </button>
             <button
               onClick={() => setShowCalendar(true)}
-              className={`p-2 rounded ${showCalendar ? "bg-sky-500 text-white" : ""}`}
+              className={`p-2 rounded ${
+                showCalendar ? "bg-sky-500 text-white" : ""
+              }`}
             >
               <CalendarIcon size={20} />
             </button>
           </div>
 
-          {/* Mobile view: toggle */}
+          {/* Mobile view toggle */}
           {!showCalendar && (
             <>
               <NewPostForm onCreate={handleCreatePost} />
@@ -311,14 +340,15 @@ export default function CommunityPage() {
           )}
         </section>
 
-        {/* Right sidebar – always visible on large screens */}
-        <aside className="hidden lg:block w-80 space-y-4">
+        {/* Sidebar */}
+        <aside className="hidden lg:block flex-shrink-0 w-72 xl:w-80 space-y-4">
           <div className="bg-white rounded-2xl shadow border border-blue-100 p-4">
             <h3 className="font-semibold mb-3">Calendar</h3>
             <Calendar value={calendarDate} onChange={setCalendarDate} />
           </div>
         </aside>
       </main>
+      <div className="pb-10" /> {/* extra padding for tablets */}
     </div>
   );
 }

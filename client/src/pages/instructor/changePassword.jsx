@@ -1,18 +1,28 @@
 // src/pages/instructor/changePassword.jsx
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "../../api/axios"; // from src/pages/instructor -> src/api is ../../api
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import axios from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
 
 export default function ChangePassword() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const location = useLocation();
+  const { user, firstLogin, refreshUser, logout } = useAuth();
+
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
+
+  // Redirect if not instructor or not first login
+  useEffect(() => {
+    if (!user) return; // wait for user
+    if (user.role !== "instructor" || !firstLogin) {
+      navigate("/instructor/dashboard");
+    }
+  }, [user, firstLogin, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,23 +39,33 @@ export default function ChangePassword() {
     try {
       setLoading(true);
 
-      // Call backend change-password route (protected)
+      // Send change-password request
       const res = await axios.put("/auth/change-password", {
         currentPassword,
         newPassword,
+        tempLogin: user.isFirstLogin, // flag for temporary password
       });
 
       setSuccessMsg(res.data?.message || "Password changed successfully.");
 
-      // Optionally force re-login: logout and redirect to login
-      // If your backend returns a new token/user, you could refresh auth instead.
-      // Here we log the user out so they re-authenticate with the new password.
+      // Refresh user to clear firstLogin
+      await refreshUser();
+
+      // Logout if temp login was used, then redirect to login
+      if (user.isFirstLogin) {
+        setTimeout(async () => {
+          await logout();
+          navigate("/login", {
+            state: { message: "Password updated. Please login with your new password." },
+          });
+        }, 1200);
+        return;
+      }
+
+      // Otherwise redirect to instructor dashboard
       setTimeout(() => {
-        try {
-          logout();
-        } catch { /* ignore */ }
-        navigate("/login");
-      }, 1400);
+        navigate("/instructor/dashboard");
+      }, 1200);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Failed to change password");
     } finally {
@@ -57,7 +77,11 @@ export default function ChangePassword() {
     <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
       <div className="w-full max-w-md bg-white rounded-xl shadow-md p-6">
         <h2 className="text-2xl font-semibold mb-4">Change Password</h2>
-        {user && <div className="text-sm text-gray-500 mb-4">Signed in as <strong>{user.email}</strong></div>}
+        {user && (
+          <div className="text-sm text-gray-500 mb-4">
+            Signed in as <strong>{user.email}</strong>
+          </div>
+        )}
 
         {error && <div className="mb-3 text-red-600 text-sm">{error}</div>}
         {successMsg && <div className="mb-3 text-green-600 text-sm">{successMsg}</div>}
@@ -71,6 +95,7 @@ export default function ChangePassword() {
               onChange={(e) => setCurrentPassword(e.target.value)}
               className="w-full px-3 py-2 border rounded"
               required
+              autoFocus
             />
           </div>
 
@@ -105,10 +130,14 @@ export default function ChangePassword() {
               {loading ? "Saving..." : "Change password"}
             </button>
 
+            {/* Cancel disabled for firstLogin */}
             <button
               type="button"
-              onClick={() => navigate(-1)}
-              className="text-sm text-gray-600 hover:underline"
+              onClick={() => !firstLogin && navigate(-1)}
+              className={`text-sm text-gray-600 hover:underline ${
+                firstLogin ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              disabled={firstLogin}
             >
               Cancel
             </button>

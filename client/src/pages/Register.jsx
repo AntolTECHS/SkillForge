@@ -31,10 +31,7 @@ const Register = () => {
   const redirectTo = location.state?.redirectTo || null;
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const isStrongPassword = (password) => {
@@ -56,17 +53,19 @@ const Register = () => {
     e.preventDefault();
     setError("");
 
-    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+    const { name, email, password, confirmPassword } = formData;
+
+    if (!name || !email || !password || !confirmPassword) {
       setError("Please fill in all fields");
       return;
     }
 
-    if (formData.password !== formData.confirmPassword) {
+    if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
-    if (!isStrongPassword(formData.password)) {
+    if (!isStrongPassword(password)) {
       setError(
         "Password must include at least 8 characters, one uppercase, one lowercase, one number, and one special character"
       );
@@ -75,23 +74,29 @@ const Register = () => {
 
     try {
       setLoading(true);
-      const res = await register(formData.name, formData.email, formData.password);
-      const createdUser = res?.user || null;
+      const res = await register(name, email, password);
+      const createdUser = res?.user || res;
 
+      // redirect if needed
       if (redirectTo) {
         navigate(redirectTo);
         return;
       }
 
-      if (createdUser?.role === "admin" || createdUser?.isAdmin) {
-        navigate("/admin");
-      } else if (createdUser?.role === "student") {
-        navigate("/dashboard");
-      } else {
-        navigate("/");
+      // role-based navigation
+      switch (createdUser?.role) {
+        case "admin":
+          navigate("/admin");
+          break;
+        case "student":
+          navigate("/dashboard");
+          break;
+        default:
+          navigate("/");
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Registration failed. Please try again.");
+      const message = err?.response?.data?.message || err?.message || "Registration failed. Please try again.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -184,57 +189,30 @@ const Register = () => {
               </button>
             </div>
 
-            {/* Password strength check */}
+            {/* Password strength indicators */}
             <div className="mt-3 space-y-1 text-sm text-gray-300">
-              <div className="flex items-center space-x-2">
-                {formData.password.length >= 8 ? (
-                  <CheckCircle className="w-4 h-4 text-green-400" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-red-400" />
-                )}
-                <span>At least 8 characters</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                {/[A-Z]/.test(formData.password) ? (
-                  <CheckCircle className="w-4 h-4 text-green-400" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-red-400" />
-                )}
-                <span>Contains an uppercase letter</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                {/[a-z]/.test(formData.password) ? (
-                  <CheckCircle className="w-4 h-4 text-green-400" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-red-400" />
-                )}
-                <span>Contains a lowercase letter</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                {/\d/.test(formData.password) ? (
-                  <CheckCircle className="w-4 h-4 text-green-400" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-red-400" />
-                )}
-                <span>Contains a number</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                {/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? (
-                  <CheckCircle className="w-4 h-4 text-green-400" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-red-400" />
-                )}
-                <span>Contains a special character</span>
-              </div>
+              {[
+                { test: /.{8,}/, label: "At least 8 characters" },
+                { test: /[A-Z]/, label: "Contains an uppercase letter" },
+                { test: /[a-z]/, label: "Contains a lowercase letter" },
+                { test: /\d/, label: "Contains a number" },
+                { test: /[!@#$%^&*(),.?":{}|<>]/, label: "Contains a special character" },
+              ].map((rule, i) => (
+                <div className="flex items-center space-x-2" key={i}>
+                  {rule.test.test(formData.password) ? (
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-red-400" />
+                  )}
+                  <span>{rule.label}</span>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* CONFIRM PASSWORD */}
           <div>
-            <label
-              htmlFor="confirmPassword"
-              className="block text-sm font-medium text-gray-200 mb-2"
-            >
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-200 mb-2">
               Confirm Password
             </label>
             <div className="relative">

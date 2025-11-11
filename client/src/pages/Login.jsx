@@ -1,3 +1,4 @@
+// src/pages/Login.jsx
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -25,29 +26,37 @@ const Login = () => {
 
     try {
       setLoading(true);
-      const res = await login(email, password);
+
+      // Send temporary password flag for instructors/admins
+      const res = await login(email, password, { temp: true });
       const user = res?.user || res;
 
-      // 🔹 Handle first-time login (for instructors/admins)
-      if (res?.firstLogin) {
+      // Redirect to change-password if first login or forced password change
+      if (res?.forcePasswordChange || user.isFirstLogin) {
         navigate("/change-password", { state: { email: user.email } });
         return;
       }
 
-      // 🔹 Handle redirect after login (if redirected from ProtectedRoute)
+      // Redirect after login (ProtectedRoute or role)
       const redirectTo = location.state?.from || null;
-
       if (redirectTo) {
         navigate(redirectTo);
         return;
       }
 
-      // 🔹 Role-based navigation
-      if (user.role === "admin") navigate("/admin");
-      else if (user.role === "instructor") navigate("/instructor");
-      else navigate("/dashboard");
+      switch (user.role) {
+        case "admin":
+          navigate("/admin");
+          break;
+        case "instructor":
+          navigate("/instructor");
+          break;
+        default:
+          navigate("/dashboard");
+      }
     } catch (err) {
-      setError(err.response?.data?.message || "Invalid email or password");
+      const message = err?.response?.data?.message || "Invalid email or password";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -69,14 +78,12 @@ const Login = () => {
           Sign in to continue your learning journey
         </p>
 
-        {/* ✅ Success message */}
         {location.state?.message && (
           <div className="bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded-lg mb-6 text-sm">
             {location.state.message}
           </div>
         )}
 
-        {/* 🔴 Error message */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center">
             <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
@@ -85,12 +92,8 @@ const Login = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* EMAIL */}
           <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-200 mb-2"
-            >
+            <label htmlFor="email" className="block text-sm font-medium text-gray-200 mb-2">
               Email Address
             </label>
             <div className="relative">
@@ -107,12 +110,8 @@ const Login = () => {
             </div>
           </div>
 
-          {/* PASSWORD */}
           <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-200 mb-2"
-            >
+            <label htmlFor="password" className="block text-sm font-medium text-gray-200 mb-2">
               Password
             </label>
             <div className="relative">
@@ -131,16 +130,11 @@ const Login = () => {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white"
               >
-                {showPassword ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
           </div>
 
-          {/* SIGN IN BUTTON */}
           <button
             type="submit"
             disabled={loading}

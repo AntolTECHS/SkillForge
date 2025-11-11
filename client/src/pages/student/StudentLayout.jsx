@@ -11,21 +11,24 @@ const StudentLayout = () => {
   const contentTopPadding = "calc(var(--navbar-height, 56px) + 24px)";
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar */}
       <Sidebar />
 
+      {/* Main content area */}
       <div
-        className={`flex flex-col transition-all duration-200 ${
+        className={`flex flex-col flex-1 transition-all duration-200 ${
           isSidebarOpen ? "" : ""
         } lg:ml-64`}
       >
         <Navbar />
 
         <main
-          className="p-4 sm:p-6 lg:p-6 w-full"
+          className="p-4 sm:p-6 lg:p-6 w-full h-full"
           style={{ paddingTop: contentTopPadding }}
         >
-          <div className="max-w-7xl mx-auto">
+          {/* Removed max-w-7xl and mx-auto so content spans full width */}
+          <div className="w-full h-full">
             <Outlet />
           </div>
         </main>
