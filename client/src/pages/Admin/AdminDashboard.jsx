@@ -324,65 +324,120 @@ function InstructorForm({ initial = null, onSave, onCancel }) {
 
         {/* Password controls */}
         <div className="mt-2">
-          <div className="flex items-center gap-3 mb-2">
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={setPassword}
-                onChange={() => setSetPassword((s) => !s)}
-              />
-              <span className="text-sm">{initial ? "Set / Reset password" : "Set password for instructor"}</span>
-            </label>
+          {initial ? (
+            <>
+              <div className="flex items-center gap-3 mb-2">
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={setPassword}
+                    onChange={() => setSetPassword((s) => !s)}
+                  />
+                  <span className="text-sm">Set / Reset password</span>
+                </label>
 
-            {setPassword && (
-              <div className="ml-auto flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const p = genPassword(12);
-                    setForm((s) => ({ ...s, password: p }));
-                    copyToClipboard(p);
-                    // optionally show a small confirmation
-                  }}
-                  className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
-                >
-                  Generate
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((s) => !s)}
-                  className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(form.password)}
-                  className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
-                >
-                  Copy
-                </button>
+                {setPassword && (
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const p = genPassword(12);
+                        setForm((s) => ({ ...s, password: p }));
+                        copyToClipboard(p);
+                      }}
+                      className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                    >
+                      Generate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((s) => !s)}
+                      className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(form.password)}
+                      className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {setPassword && (
-            <div>
-              <label className="block text-xs text-gray-600">Password</label>
-              <input
-                name="password"
-                value={form.password}
-                onChange={handleChange}
-                type={showPassword ? "text" : "password"}
-                className="w-full px-3 py-2 border rounded"
-                placeholder="Enter a secure password (min 8 chars)"
-                autoComplete={initial ? "new-password" : "new-password"}
-                aria-describedby="passwordHelp"
-              />
-              <div id="passwordHelp" className="text-xs text-gray-400 mt-1">
-                {form.password ? `${form.password.length} characters` : "Password not set"}
+              {setPassword && (
+                <div>
+                  <label className="block text-xs text-gray-600">Password</label>
+                  <input
+                    name="password"
+                    value={form.password}
+                    onChange={handleChange}
+                    type={showPassword ? "text" : "password"}
+                    className="w-full px-3 py-2 border rounded"
+                    placeholder="Enter a secure password (min 8 chars)"
+                    autoComplete="new-password"
+                    aria-describedby="passwordHelp"
+                    required
+                  />
+                  <div id="passwordHelp" className="text-xs text-gray-400 mt-1">
+                    {form.password ? `${form.password.length} characters` : "Password not set"}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs text-gray-600">Password (required)</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const p = genPassword(12);
+                      setForm((s) => ({ ...s, password: p }));
+                      copyToClipboard(p);
+                    }}
+                    className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                    title="Generate a secure password (admin must confirm)"
+                  >
+                    Generate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(form.password)}
+                    className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                  >
+                    Copy
+                  </button>
+                </div>
               </div>
-            </div>
+
+              <div>
+                <input
+                  name="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  type={showPassword ? "text" : "password"}
+                  className="w-full px-3 py-2 border rounded"
+                  placeholder="Enter a secure password (min 8 chars)"
+                  autoComplete="new-password"
+                  aria-describedby="passwordHelp"
+                  required
+                />
+                <div id="passwordHelp" className="text-xs text-gray-400 mt-1">
+                  {form.password ? `${form.password.length} characters` : "Password required"}
+                </div>
+              </div>
+            </>
           )}
         </div>
 
@@ -797,16 +852,43 @@ export default function AdminDashboard() {
           setEditingInstructor(null);
         } else {
           // Create path: try admin endpoint first, fallback only on network/404.
+          let created = null;
           try {
-            await axios.post("/admin/instructors", form);
+            const res = await axios.post("/admin/instructors", form);
+            created = res?.data ?? res;
           } catch (err) {
             const status = err?.response?.status;
             if (!err.response || status === 404) {
-              await axios.post("/instructors", form);
+              const res2 = await axios.post("/instructors", form);
+              created = res2?.data ?? res2;
             } else {
               // For 400/401/403/etc - do not retry. Surface to caller.
               throw err;
             }
+          }
+
+          // After successful creation, attempt to send welcome email (server must implement endpoint)
+          try {
+            const id = created?._id ?? created?.id;
+            if (id && form.password) {
+              await axios
+                .post(`/admin/instructors/${id}/send-welcome`, {
+                  email: form.email,
+                  password: form.password,
+                })
+                .catch(() =>
+                  axios.post(`/instructors/${id}/send-welcome`, {
+                    email: form.email,
+                    password: form.password,
+                  })
+                );
+              try { alert("Instructor created and welcome email sent."); } catch (e) {}
+            } else {
+              try { alert("Instructor created. No welcome email sent (missing id or password)."); } catch (e) {}
+            }
+          } catch (err) {
+            console.warn("Welcome email failed:", err);
+            try { alert("Instructor created, but failed to send welcome email."); } catch (e) {}
           }
         }
         await fetchAllData();

@@ -4,182 +4,188 @@ import User from "../models/User.js";
 import generateToken from "../utils/generateToken.js";
 
 /**
- * @desc    Register a new student
- * @route   POST /api/auth/register
- * @access  Public
+ * @desc Register a new student
+ * @route POST /api/auth/register
+ * @access Public
  */
 export const registerStudent = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
-    console.log("🪵 REGISTER BODY:", { name, email }); // do not log password
+    let { name, email, password } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
 
-    // Check existing user
+    email = email.trim().toLowerCase();
     const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ message: "User already exists" });
+    if (existingUser)
+      return res.status(400).json({ message: "User already exists" });
 
-    // Create student - model pre('save') will hash password if needed,
-    // but hashing here is fine as well. We'll let model handle hashing to keep logic central.
     const user = await User.create({
       name,
       email,
-      password, // will be hashed by User model pre('save')
+      password, // hashed via pre('save')
       role: "student",
     });
 
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token: generateToken(user._id, user.role),
+    const token = generateToken(user._id, user.role);
+    return res.status(201).json({
+      user: { _id: user._id, name: user.name, email: user.email, role: user.role },
+      token,
     });
   } catch (error) {
     console.error("❌ Register Error:", error);
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
 /**
- * @desc    Login (Student, Instructor, Admin)
- * @route   POST /api/auth/login
- * @access  Public
- *
- * Behavior:
- * - Accepts permanent password (user.password) OR one-time temp password (user.tempPasswordHash)
- * - If one-time password is used, response includes forcePasswordChange: true
- * - If user.forcePasswordChange is already set, login with permanent password is still allowed
- *   but response will include forcePasswordChange: true (so frontend can force a change)
+ * @desc Login (all roles, temp password support)
+ * @route POST /api/auth/login
+ * @access Public
  */
 export const loginUser = async (req, res) => {
   try {
-    console.log("🪵 LOGIN BODY:", { email: req.body?.email }); // avoid logging password
-
-    const { email, password } = req.body;
+    let { email, password } = req.body;
     if (!email || !password)
       return res.status(400).json({ message: "Email and password are required" });
 
+    email = email.trim().toLowerCase();
+    password = password.trim();
+
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    console.log("Login attempt:", email);
+    if (!user)
+      return res.status(400).json({ message: "Invalid credentials" });
 
     if (!user.isActive)
       return res.status(403).json({ message: "Account is deactivated" });
 
-    // Try permanent password first (using model helper)
+    // Check permanent password
     const isPermanent = await user.matchPassword(password);
+    console.log("Permanent password match:", isPermanent);
 
-    // Try temp one-time password (if permanent didn't match)
-    const isTemp = !isPermanent && (await user.matchTempPassword(password));
-
-    if (!isPermanent && !isTemp) {
-      return res.status(400).json({ message: "Invalid credentials" });
+    // Check temporary password
+    let isTemp = false;
+    if (!isPermanent && user.tempPasswordHash) {
+      if (!user.tempPasswordExpiry || user.tempPasswordExpiry.getTime() > Date.now()) {
+        isTemp = await user.matchTempPassword(password);
+        console.log("Temporary password match:", isTemp);
+      } else {
+        console.log("Temporary password expired");
+        return res.status(400).json({ message: "Temporary password expired" });
+      }
     }
 
-    // At this point, login succeeded with either permanent or temp password.
-    // Generate token. Consider returning a short-lived token if isTemp is true.
-    // For simplicity, we issue the same token but include a flag in the response.
+    if (!isPermanent && !isTemp)
+      return res.status(400).json({ message: "Invalid credentials" });
+
     const token = generateToken(user._id, user.role);
-
-    // If login used temp password OR user.forcePasswordChange is set -> force frontend to change password
-    const needForceChange = Boolean(isTemp || user.forcePasswordChange || user.isFirstLogin);
-
-    // If temp password was used you might want to keep force flags as-is (do not clear them here).
-    // Clearing happens after user explicitly changes password via changePassword endpoint.
-
-    const payload = {
+    const safeUser = {
       _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
-      token,
+      isFirstLogin: user.isFirstLogin,
+      forcePasswordChange: user.forcePasswordChange,
     };
 
-    // include the force flag so frontend can redirect to change-password UI
-    if (needForceChange) {
-      return res.status(200).json({
-        ...payload,
-        forcePasswordChange: true,
-        message: isTemp
-          ? "Logged in with temporary password — please change your password"
-          : "Password change required — please update your password",
-      });
-    }
+    const forcePasswordChange = isTemp || user.forcePasswordChange || user.isFirstLogin;
 
-    // Normal login
-    return res.status(200).json(payload);
+    return res.status(200).json({
+      user: safeUser,
+      token,
+      forcePasswordChange,
+      message: forcePasswordChange
+        ? isTemp
+          ? "Logged in with temporary password — please change your password"
+          : "Password change required — please update your password"
+        : "Login successful",
+    });
   } catch (error) {
     console.error("❌ Login Error:", error);
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
 /**
- * @desc    Change Password (for first-time instructor, forced reset, or normal update)
- * @route   PUT /api/auth/change-password
- * @access  Private (requires authentication middleware that sets req.user)
- *
- * Behavior:
- * - If user.forcePasswordChange === true OR user.isFirstLogin === true:
- *     - Allow password change WITHOUT currentPassword (user was issued a temp password)
- * - Else:
- *     - Require `currentPassword` to match existing permanent password
- *
- * On success:
- * - Set the permanent password
- * - Clear tempPasswordHash, tempPasswordExpiry, forcePasswordChange, isFirstLogin
+ * @desc Change password (supports temporary password)
+ * @route PUT or POST /api/auth/change-password
+ * @access Private
  */
 export const changePassword = async (req, res) => {
   try {
-    console.log("🪵 CHANGE PASSWORD BODY:", { hasCurrent: Boolean(req.body.currentPassword) }); // do not log passwords
-
     const { currentPassword, newPassword } = req.body;
     if (!newPassword || newPassword.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "New password is required and must be at least 6 characters" });
+      return res.status(400).json({ message: "New password must be at least 6 characters" });
     }
 
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    const isForced = Boolean(user.forcePasswordChange || user.isFirstLogin);
+    let validCurrent = false;
 
-    if (!isForced) {
-      // Normal change: require currentPassword
-      if (!currentPassword) {
-        return res.status(400).json({ message: "Current password is required" });
-      }
-
-      const isMatch = await user.matchPassword(currentPassword);
-      if (!isMatch) return res.status(400).json({ message: "Current password is incorrect" });
-    } else {
-      // Forced change (temp password flow) - optionally verify that a temp password was used recently.
-      // We assume the user has already authenticated (has token). No extra verification here.
+    // Allow change if user is forced or first login, or current password matches permanent/temporary
+    if (user.forcePasswordChange || user.isFirstLogin) {
+      validCurrent = true;
+    } else if (currentPassword) {
+      const matchPermanent = await user.matchPassword(currentPassword);
+      const matchTemp =
+        user.tempPasswordHash &&
+        (await user.matchTempPassword(currentPassword));
+      validCurrent = matchPermanent || matchTemp;
     }
 
-    // Use model helper to set permanent password and clear temp state
-    user.setPassword(newPassword);
-    user.isFirstLogin = false;
-    user.forcePasswordChange = false;
+    if (!validCurrent)
+      return res.status(400).json({ message: "Current password is incorrect" });
+
+    // Update password and clear temp fields
+    await user.setPassword(newPassword);
     user.tempPasswordHash = null;
     user.tempPasswordExpiry = null;
+    user.forcePasswordChange = false;
+    user.isFirstLogin = false;
 
     await user.save();
 
-    // Optionally return a refreshed token
     const token = generateToken(user._id, user.role);
-
-    res.status(200).json({
+    return res.status(200).json({
       message: "Password changed successfully",
       user: {
         _id: user._id,
+        name: user.name,
         email: user.email,
         role: user.role,
-        isFirstLogin: user.isFirstLogin,
       },
       token,
     });
   } catch (error) {
     console.error("❌ Change Password Error:", error);
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+/**
+ * @desc Get current logged-in user
+ * @route GET /api/auth/me
+ * @access Private
+ */
+export const getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const safeUser = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isFirstLogin: user.isFirstLogin,
+      forcePasswordChange: user.forcePasswordChange,
+    };
+
+    return res.status(200).json({ user: safeUser });
+  } catch (err) {
+    console.error("❌ GetMe Error:", err);
+    return res.status(500).json({ message: err.message });
   }
 };

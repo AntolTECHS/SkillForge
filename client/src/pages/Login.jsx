@@ -13,13 +13,13 @@ const Login = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, firstLogin } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (!email || !password) {
+    if (!email.trim() || !password) {
       setError("Please fill in both fields");
       return;
     }
@@ -27,36 +27,35 @@ const Login = () => {
     try {
       setLoading(true);
 
-      // Send temporary password flag for instructors/admins
-      const res = await login(email, password, { temp: true });
-      const user = res?.user || res;
+      const res = await login(email.trim(), password);
 
-      // Redirect to change-password if first login or forced password change
-      if (res?.forcePasswordChange || user.isFirstLogin) {
-        navigate("/change-password", { state: { email: user.email } });
+      // Redirect to change-password if forced
+      if (res.forcePasswordChange || firstLogin) {
+        navigate("/change-password", { state: { email: email.trim() } });
         return;
       }
 
-      // Redirect after login (ProtectedRoute or role)
+      // Redirect based on role or previous page
       const redirectTo = location.state?.from || null;
       if (redirectTo) {
         navigate(redirectTo);
         return;
       }
 
-      switch (user.role) {
+      switch (res.user.role) {
         case "admin":
-          navigate("/admin");
+          navigate("/admin/dashboard");
           break;
         case "instructor":
-          navigate("/instructor");
+          navigate("/instructor/dashboard");
           break;
         default:
-          navigate("/dashboard");
+          navigate("/student/dashboard");
       }
     } catch (err) {
-      const message = err?.response?.data?.message || "Invalid email or password";
-      setError(message);
+      console.error("[Login] error:", err);
+      const msg = err?.message || err?.data?.message || "Invalid credentials. Please try again.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -77,12 +76,6 @@ const Login = () => {
         <p className="text-center text-gray-300 mb-8">
           Sign in to continue your learning journey
         </p>
-
-        {location.state?.message && (
-          <div className="bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded-lg mb-6 text-sm">
-            {location.state.message}
-          </div>
-        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center">

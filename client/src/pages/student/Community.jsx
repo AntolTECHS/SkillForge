@@ -1,6 +1,6 @@
+// src/pages/student/Community.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import Navbar from "../../components/Navbar";
 import {
   MessageSquare,
   Heart,
@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
-import axios from "axios";
+import axios from "../../api/axios";
 
 // ----------------------
 // New Post Form with Image Upload
@@ -31,17 +31,16 @@ function NewPostForm({ onCreate }) {
         const formData = new FormData();
         formData.append("file", imageFile);
 
-        const res = await axios.post(
-          "http://localhost:5000/api/uploads",
-          formData,
-          { headers: { "Content-Type": "multipart/form-data" } }
-        );
+        const res = await axios.post("/uploads", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
 
-        imageUrl = `http://localhost:5000${res.data.url}`;
+        imageUrl = res.data.url.startsWith("/")
+          ? `http://localhost:5000${res.data.url}`
+          : res.data.url;
       } catch (err) {
         console.error("Image upload failed:", err);
         alert("Failed to upload image.");
-        setUploading(false);
         return;
       } finally {
         setUploading(false);
@@ -71,13 +70,13 @@ function NewPostForm({ onCreate }) {
             type="file"
             accept="image/*"
             onChange={(e) => setImageFile(e.target.files[0])}
-            className="flex-1 text-sm"
+            className="flex-1 text-sm w-full sm:w-auto"
           />
           <div className="flex justify-end w-full sm:w-auto">
             <button
               type="submit"
               disabled={uploading}
-              className="flex items-center gap-2 px-3 py-2 bg-sky-500 text-white rounded-lg disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-2 bg-sky-500 text-white rounded-lg disabled:opacity-50 w-full sm:w-auto justify-center"
             >
               <PlusCircle size={16} /> {uploading ? "Uploading..." : "Post"}
             </button>
@@ -91,14 +90,17 @@ function NewPostForm({ onCreate }) {
 // ----------------------
 // Post Card Component
 // ----------------------
-function PostCard({ post, onLike, onComment }) {
+function PostCard({ post, onLike, onComment, userId }) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
 
   const handleComment = (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
-    onComment(post._id, { text: commentText.trim() });
+
+    // Send correct payload with text + author
+    onComment(post._id, { text: commentText.trim(), author: userId });
+
     setCommentText("");
     setShowComments(true);
   };
@@ -133,15 +135,11 @@ function PostCard({ post, onLike, onComment }) {
 
           {post.image && (
             <div className="mt-3 rounded-lg overflow-hidden border">
-              <img
-                src={post.image}
-                alt="post"
-                className="w-full h-56 object-cover"
-              />
+              <img src={post.image} alt="post" className="w-full h-56 object-cover" />
             </div>
           )}
 
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex gap-2 flex-wrap">
             <button
               onClick={() => onLike(post._id)}
               className="flex items-center gap-2 text-sm px-3 py-1 rounded-lg hover:bg-gray-50"
@@ -157,35 +155,41 @@ function PostCard({ post, onLike, onComment }) {
           </div>
 
           {showComments && (
-            <div className="mt-3 border-t pt-3">
-              {(Array.isArray(post.comments) ? post.comments : []).map(
-                (c, idx) => (
-                  <div key={idx} className="flex gap-3 items-start">
-                    <img
-                      src={
-                        c.author?.avatar ||
-                        "https://cdn-icons-png.flaticon.com/512/194/194938.png"
-                      }
-                      alt={c.author?.name || "User"}
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                    <div className="bg-gray-50 p-2 rounded-lg">
-                      <div className="text-sm font-medium">
-                        {c.author?.name || "User"}
-                      </div>
-                      <div className="text-xs text-gray-600">{c.text}</div>
+            <div className="mt-3 border-t pt-3 space-y-2">
+              {(post.comments || []).map((c, idx) => (
+                <div key={idx} className="flex gap-3 items-start">
+                  <img
+                    src={
+                      c.author?.avatar ||
+                      "https://cdn-icons-png.flaticon.com/512/194/194938.png"
+                    }
+                    alt={c.author?.name || "User"}
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
+                  <div className="bg-gray-50 p-2 rounded-lg flex-1">
+                    <div className="text-sm font-medium">
+                      {c.author?.name || "User"}
                     </div>
+                    <div className="text-xs text-gray-600">{c.text}</div>
                   </div>
-                )
-              )}
-              <form onSubmit={handleComment} className="mt-3 flex gap-2 items-start">
+                </div>
+              ))}
+
+              {/* Responsive Comment Form */}
+              <form
+                onSubmit={handleComment}
+                className="mt-3 flex flex-col sm:flex-row gap-2 items-start"
+              >
                 <input
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   placeholder="Write a comment..."
-                  className="flex-1 px-3 py-2 border rounded-md"
+                  className="flex-1 px-3 py-2 border rounded-md w-full"
                 />
-                <button className="px-3 py-2 bg-sky-500 text-white rounded-md">
+                <button
+                  type="submit"
+                  className="px-3 py-2 bg-sky-500 text-white rounded-md w-full sm:w-auto"
+                >
                   Reply
                 </button>
               </form>
@@ -209,10 +213,9 @@ export default function CommunityPage() {
 
   const fetchPosts = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/community/posts", {
-        headers: user?.token ? { Authorization: `Bearer ${user.token}` } : {},
-      });
-      setPosts(Array.isArray(res.data) ? res.data : []);
+      const res = await axios.get("/community/posts");
+      const data = res.data.posts || res.data || [];
+      setPosts(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch posts:", err);
       setPosts([]);
@@ -226,11 +229,10 @@ export default function CommunityPage() {
   const handleCreatePost = async (newPost) => {
     if (!user) return alert("User not logged in.");
     try {
-      const res = await axios.post(
-        "http://localhost:5000/api/community/posts",
-        newPost,
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
+      const res = await axios.post("/community/posts", {
+        ...newPost,
+        authorId: user._id,
+      });
       setPosts((prev) => [res.data, ...prev]);
     } catch (err) {
       console.error("Failed to create post:", err);
@@ -240,18 +242,12 @@ export default function CommunityPage() {
 
   const handleLike = async (postId) => {
     try {
-      const res = await axios.put(
-        `http://localhost:5000/api/community/posts/${postId}/like`,
-        {},
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
+      const res = await axios.put(`/community/posts/${postId}/like`);
       const updatedPost = {
         ...posts.find((p) => p._id === postId),
         likes: res.data.likes,
       };
-      setPosts((prev) =>
-        prev.map((p) => (p._id === postId ? updatedPost : p))
-      );
+      setPosts((prev) => prev.map((p) => (p._id === postId ? updatedPost : p)));
     } catch (err) {
       console.error("Failed to like post:", err);
     }
@@ -259,17 +255,12 @@ export default function CommunityPage() {
 
   const handleComment = async (postId, comment) => {
     try {
-      const res = await axios.post(
-        `http://localhost:5000/api/community/posts/${postId}/comment`,
-        comment,
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
+      const res = await axios.post(`/community/posts/${postId}/comment`, comment);
       const updatedPost = res.data;
-      setPosts((prev) =>
-        prev.map((p) => (p._id === postId ? updatedPost : p))
-      );
+      setPosts((prev) => prev.map((p) => (p._id === postId ? updatedPost : p)));
     } catch (err) {
-      console.error("Failed to comment:", err);
+      console.error("Failed to comment:", err.response?.data || err);
+      alert("Failed to post comment. Please try again.");
     }
   };
 
@@ -296,23 +287,18 @@ export default function CommunityPage() {
           <div className="flex gap-6 mt-2 mb-4 lg:hidden justify-center">
             <button
               onClick={() => setShowCalendar(false)}
-              className={`px-3 py-1 rounded ${
-                !showCalendar ? "bg-sky-500 text-white" : ""
-              }`}
+              className={`px-3 py-1 rounded ${!showCalendar ? "bg-sky-500 text-white" : ""}`}
             >
               Posts
             </button>
             <button
               onClick={() => setShowCalendar(true)}
-              className={`p-2 rounded ${
-                showCalendar ? "bg-sky-500 text-white" : ""
-              }`}
+              className={`p-2 rounded ${showCalendar ? "bg-sky-500 text-white" : ""}`}
             >
               <CalendarIcon size={20} />
             </button>
           </div>
 
-          {/* Mobile view toggle */}
           {!showCalendar && (
             <>
               <NewPostForm onCreate={handleCreatePost} />
@@ -326,6 +312,7 @@ export default function CommunityPage() {
                       post={p}
                       onLike={handleLike}
                       onComment={handleComment}
+                      userId={user?._id} // pass logged-in user ID
                     />
                   ))
                 )}
@@ -348,7 +335,7 @@ export default function CommunityPage() {
           </div>
         </aside>
       </main>
-      <div className="pb-10" /> {/* extra padding for tablets */}
+      <div className="pb-10" />
     </div>
   );
 }
