@@ -1,12 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import {
-  BookOpen,
-  PlusCircle,
-  ClipboardList,
-  Users,
-  Settings,
-  Home,
-} from "lucide-react";
+import { Home, BookOpen, PlusCircle, ClipboardList, Users, Settings } from "lucide-react";
 
 const InstructorSidebar = () => {
   const location = useLocation();
@@ -21,7 +14,7 @@ const InstructorSidebar = () => {
   ];
 
   return (
-    <aside className="w-64 bg-white shadow-md min-h-screen hidden lg:flex flex-col pt-20">
+    <aside className="w-64 bg-white shadow-md min-h-screen flex flex-col pt-20">
       <nav className="flex flex-col gap-2 px-4">
         {tabs.map((tab) => {
           const Icon = tab.icon;

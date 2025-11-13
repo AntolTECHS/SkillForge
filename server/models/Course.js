@@ -1,37 +1,34 @@
-// models/Course.js
+// server/models/Course.js
 import mongoose from "mongoose";
+
+const lessonSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  type: { type: String, enum: ["video", "pdf", "text"], default: "video" },
+  url: { 
+    type: String, 
+    required: function () {
+      return this.type !== "text"; // video/pdf require URL
+    }
+  },
+  contentText: { 
+    type: String, 
+    required: function () {
+      return this.type === "text"; // text lessons require contentText
+    }
+  },
+});
 
 const courseSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
-    description: String,
-    thumbnail: String,
-    instructor: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    modules: [{ type: mongoose.Schema.Types.ObjectId, ref: "Module" }],
-    quizzes: [{ type: mongoose.Schema.Types.ObjectId, ref: "Quiz" }],
-    isPublished: { type: Boolean, default: false },
-    price: { type: Number, default: 0 },
-    category: {
-      type: String,
-      enum: ["Programming", "Design", "Marketing", "Business", "Other"],
-      default: "Programming",
-    },
-    level: {
-      type: String,
-      enum: ["Beginner", "Intermediate", "Advanced"],
-      default: "Beginner",
-    },
-    duration: { type: String, default: "Self-paced" },
-    totalLessons: { type: Number, default: 0 },
-    averageRating: { type: Number, default: 0 },
-    enrollmentCount: { type: Number, default: 0 },
+    description: { type: String, required: true },
+    price: { type: Number, required: true },
+    category: { type: String, required: true },
+    instructor: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    image: { type: String }, // new course image field
+    content: [lessonSchema],
   },
   { timestamps: true }
 );
 
-const Course = mongoose.models.Course || mongoose.model("Course", courseSchema);
-export default Course;
+export default mongoose.model("Course", courseSchema);

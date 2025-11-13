@@ -18,8 +18,6 @@ import courseRoutes from "./routes/courseRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import enrollmentRoutes from "./routes/enrollmentRoutes.js";
 import openRouterRoutes from "./routes/openRouterRoutes.js"; // SkillForge AI
-
-// 🟢 Community page routes
 import communityPostsRoutes from "./routes/posts.js";
 import communityMembersRoutes from "./routes/members.js";
 
@@ -35,36 +33,36 @@ connectDB();
 // ✅ CORS setup
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "http://localhost:5173", // React frontend
     credentials: true,
   })
 );
 
 // ✅ Middlewares
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "50mb" })); // increased for large uploads
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 
-// ✅ Serve uploads folder
+// ✅ Ensure uploads folder exists
 const __dirname = path.resolve();
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
+// ✅ Serve uploads folder
 app.use("/uploads", express.static(uploadsDir));
 
-// ✅ Multer setup for uploads
+// ✅ Multer setup for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) =>
-    cb(null, Date.now() + path.extname(file.originalname)),
+    cb(null, `${Date.now()}-${file.originalname}`),
 });
-
 const upload = multer({ storage });
 
-// ✅ Upload route
+// ✅ Upload route (videos, PDFs, images)
 app.post("/api/uploads", upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-  res.json({ url: `/uploads/${req.file.filename}` });
+  res.status(201).json({ url: `/uploads/${req.file.filename}` });
 });
 
 // ✅ Health check
@@ -72,7 +70,7 @@ app.get("/", (req, res) => {
   res.send("🚀 LearnSphere API is running...");
 });
 
-// ✅ Register Routes
+// ✅ Register API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/instructors", instructorRoutes);
@@ -80,14 +78,11 @@ app.use("/api/student", studentRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
-
-// 🧠 SkillForge AI Chat
 app.use("/api/skillforge", openRouterRoutes);
 
 // 🌐 Community page API
-// Base path: /api/community
-app.use("/api/community/posts", communityPostsRoutes); // GET, POST, LIKE, COMMENT
-app.use("/api/community/members", communityMembersRoutes); // GET members list
+app.use("/api/community/posts", communityPostsRoutes);
+app.use("/api/community/members", communityMembersRoutes);
 
 // ✅ Global error handler
 app.use(errorHandler);

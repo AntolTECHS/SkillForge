@@ -1,159 +1,246 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Upload } from "lucide-react";
 
 const CreateCourse = () => {
-  const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+  const [course, setCourse] = useState({
     title: "",
     description: "",
     price: "",
-    thumbnail: "",
+    category: "",
+    image: null, // new field for course image
+    content: [{ title: "", type: "text", file: null, contentText: "" }],
   });
-  const [preview, setPreview] = useState("");
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  // Add a new lesson
+  const handleAddLesson = () => {
+    setCourse({
+      ...course,
+      content: [
+        ...course.content,
+        { title: "", type: "text", file: null, contentText: "" },
+      ],
+    });
   };
 
-  const handleThumbnailChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result);
-        setFormData({ ...formData, thumbnail: reader.result });
-      };
-      reader.readAsDataURL(file);
-    }
+  // Remove a lesson
+  const handleRemoveLesson = (index) => {
+    const newContent = [...course.content];
+    newContent.splice(index, 1);
+    setCourse({ ...course, content: newContent });
   };
 
+  // Update lesson fields
+  const handleLessonChange = (index, field, value) => {
+    const newContent = [...course.content];
+    newContent[index][field] = value;
+    setCourse({ ...course, content: newContent });
+  };
+
+  // Update lesson file
+  const handleFileChange = (index, file) => {
+    const newContent = [...course.content];
+    newContent[index].file = file;
+    setCourse({ ...course, content: newContent });
+  };
+
+  // Update course image
+  const handleImageChange = (file) => {
+    setCourse({ ...course, image: file });
+  };
+
+  // Submit course
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
     try {
-      await axios.post("/api/instructor/courses", formData, {
-        withCredentials: true,
+      const token = localStorage.getItem("token");
+      const formData = new FormData();
+
+      // Append course info
+      formData.append("title", course.title);
+      formData.append("description", course.description);
+      formData.append("price", course.price);
+      formData.append("category", course.category);
+
+      // Append course image if uploaded
+      if (course.image) {
+        formData.append("image", course.image);
+      }
+
+      // Prepare lesson content
+      const lessonsWithoutFiles = course.content.map((lesson) => ({
+        title: lesson.title,
+        type: lesson.type,
+        contentText: lesson.contentText || "",
+      }));
+      formData.append("content", JSON.stringify(lessonsWithoutFiles));
+
+      // Append lesson files
+      course.content.forEach((lesson) => {
+        if (lesson.file) {
+          formData.append("files", lesson.file);
+        }
       });
-      alert("✅ Course created successfully!");
-      navigate("/instructor/dashboard");
+
+      await axios.post("http://localhost:5000/api/courses", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      navigate("/instructor/my-courses");
     } catch (err) {
-      console.error("Error creating course:", err);
-      alert("❌ Failed to create course. Try again.");
+      console.error("Failed to create course", err);
+      alert("Failed to create course. Check console for details.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 px-6 py-10">
-      <div className="max-w-3xl mx-auto bg-white shadow-md rounded-2xl p-8">
-        {/* Header */}
-        <div className="flex items-center mb-6">
+    <div className="max-w-4xl mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-6">Create New Course</h1>
+      <form
+        className="bg-white shadow rounded-xl p-6 space-y-6"
+        onSubmit={handleSubmit}
+      >
+        {/* Course Info */}
+        <input
+          type="text"
+          placeholder="Course Title"
+          value={course.title}
+          onChange={(e) => setCourse({ ...course, title: e.target.value })}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2"
+          required
+        />
+        <textarea
+          placeholder="Course Description"
+          value={course.description}
+          onChange={(e) =>
+            setCourse({ ...course, description: e.target.value })
+          }
+          className="w-full border border-gray-300 rounded-lg px-3 py-2"
+          rows="4"
+          required
+        />
+        <div className="grid grid-cols-2 gap-4">
+          <input
+            type="number"
+            placeholder="Price"
+            value={course.price}
+            onChange={(e) => setCourse({ ...course, price: e.target.value })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            required
+          />
+          <input
+            type="text"
+            placeholder="Category"
+            value={course.category}
+            onChange={(e) =>
+              setCourse({ ...course, category: e.target.value })
+            }
+            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            required
+          />
+        </div>
+
+        {/* Course Image */}
+        <div>
+          <label className="block mb-2 font-medium">Course Image</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleImageChange(e.target.files[0])}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+          />
+        </div>
+
+        {/* Lessons */}
+        <div>
+          <h2 className="text-xl font-semibold mb-3">Course Lessons</h2>
+          {course.content.map((lesson, index) => (
+            <div
+              key={index}
+              className="border border-gray-200 rounded-xl p-4 mb-4 relative"
+            >
+              <input
+                type="text"
+                placeholder="Lesson Title"
+                value={lesson.title}
+                onChange={(e) =>
+                  handleLessonChange(index, "title", e.target.value)
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-2"
+                required
+              />
+              <select
+                value={lesson.type}
+                onChange={(e) =>
+                  handleLessonChange(index, "type", e.target.value)
+                }
+                className="border border-gray-300 rounded-lg px-3 py-2 mb-2 w-full"
+              >
+                <option value="text">Text</option>
+                <option value="video">Video</option>
+                <option value="pdf">PDF</option>
+              </select>
+
+              {lesson.type === "text" && (
+                <textarea
+                  placeholder="Lesson content"
+                  value={lesson.contentText}
+                  onChange={(e) =>
+                    handleLessonChange(index, "contentText", e.target.value)
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-2"
+                  rows="4"
+                  required
+                />
+              )}
+
+              {(lesson.type === "video" || lesson.type === "pdf") && (
+                <input
+                  type="file"
+                  onChange={(e) => handleFileChange(index, e.target.files[0])}
+                  className="w-full mb-2"
+                  required
+                />
+              )}
+
+              {course.content.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveLesson(index)}
+                  className="absolute top-2 right-2 text-red-600 hover:text-red-800 font-bold"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          ))}
+
           <button
-            onClick={() => navigate(-1)}
-            className="text-gray-600 hover:text-blue-600 flex items-center"
+            type="button"
+            onClick={handleAddLesson}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
           >
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            Back
+            + Add Lesson
           </button>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">
-          Create New Course
-        </h1>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Title */}
-          <div>
-            <label className="block text-gray-700 font-medium mb-2">
-              Course Title
-            </label>
-            <input
-              type="text"
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              required
-              placeholder="Enter course title"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-gray-700 font-medium mb-2">
-              Description
-            </label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              required
-              placeholder="Write a brief course overview..."
-              rows="4"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            ></textarea>
-          </div>
-
-          {/* Price */}
-          <div>
-            <label className="block text-gray-700 font-medium mb-2">
-              Price (Ksh)
-            </label>
-            <input
-              type="number"
-              name="price"
-              value={formData.price}
-              onChange={handleChange}
-              placeholder="0 for free"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
-          </div>
-
-          {/* Thumbnail */}
-          <div>
-            <label className="block text-gray-700 font-medium mb-2">
-              Thumbnail Image
-            </label>
-            <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 transition">
-              {preview ? (
-                <img
-                  src={preview}
-                  alt="Thumbnail Preview"
-                  className="w-full max-h-56 object-cover rounded-lg mb-3"
-                />
-              ) : (
-                <Upload className="w-10 h-10 text-gray-400 mb-3" />
-              )}
-              <label
-                htmlFor="thumbnail"
-                className="cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-              >
-                {preview ? "Change Image" : "Upload Image"}
-              </label>
-              <input
-                type="file"
-                id="thumbnail"
-                accept="image/*"
-                className="hidden"
-                onChange={handleThumbnailChange}
-              />
-            </div>
-          </div>
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition"
-          >
-            {loading ? "Creating Course..." : "Create Course"}
-          </button>
-        </form>
-      </div>
+        <button
+          type="submit"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg mt-4"
+          disabled={loading}
+        >
+          {loading ? "Creating..." : "Create Course"}
+        </button>
+      </form>
     </div>
   );
 };

@@ -1,4 +1,3 @@
-// src/App.jsx
 import React from "react";
 import {
   BrowserRouter as Router,
@@ -26,10 +25,15 @@ import StudentCertificates from "./pages/student/StudentCertificates";
 import StudentRewards from "./pages/student/StudentRewards";
 import CommunityPage from "./pages/student/Community";
 
-// ==================== Instructor pages ====================
-import InstructorDashboard from "./pages/instructor/instructorDashboard";
-import ChangePassword from "./pages/instructor/changePassword";
+// ==================== Instructor pages / layout ====================
+import InstructorLayout from "./pages/instructor/InstructorLayout";
+import InstructorDashboard from "./pages/instructor/InstructorDashboard";
+import MyCourses from "./pages/instructor/MyCourses";
 import CreateCourse from "./pages/instructor/CreateCourse";
+import Quizzes from "./pages/instructor/Quizzes";
+import Students from "./pages/instructor/Students";
+import Settings from "./pages/instructor/Settings";
+import ChangePassword from "./pages/instructor/changePassword";
 
 // ==================== Admin pages ====================
 import AdminDashboard from "./pages/Admin/AdminDashboard";
@@ -53,18 +57,19 @@ function AppLayout() {
     location.pathname.startsWith("/instructor");
 
   // Determine default redirect after login
-  const defaultRedirect = user?.role === "instructor"
-    ? "/instructor"
-    : user?.role === "admin"
-    ? "/admin"
-    : "/student/dashboard";
+  const defaultRedirect =
+    user?.role === "instructor"
+      ? "/instructor/dashboard"
+      : user?.role === "admin"
+      ? "/admin"
+      : "/student/dashboard";
 
   return (
     <div className="min-h-screen bg-gray-50">
       {!hideNavbar && <Navbar />}
 
       <Routes>
-        {/* Default redirect depending on user role */}
+        {/* ==================== DEFAULT REDIRECT ==================== */}
         <Route
           path="/"
           element={
@@ -100,33 +105,25 @@ function AppLayout() {
 
         {/* ==================== INSTRUCTOR ROUTES ==================== */}
         <Route
-          path="/instructor"
+          path="/instructor/*"
           element={
             <ProtectedRoute instructorOnly>
-              <InstructorDashboard />
+              <InstructorLayout />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/instructor/create-course"
-          element={
-            <ProtectedRoute instructorOnly>
-              <CreateCourse />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/instructor/change-password"
-          element={
-            <ProtectedRoute instructorOnly>
-              <ChangePassword />
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route path="dashboard" element={<InstructorDashboard />} />
+          <Route path="my-courses" element={<MyCourses />} />
+          <Route path="create-course" element={<CreateCourse />} />
+          <Route path="quizzes" element={<Quizzes />} />
+          <Route path="students" element={<Students />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="change-password" element={<ChangePassword />} />
+        </Route>
 
         {/* ==================== ADMIN ROUTES ==================== */}
         <Route
-          path="/admin"
+          path="/admin/*"
           element={
             <ProtectedRoute adminOnly>
               <AdminDashboard />
@@ -153,7 +150,7 @@ function AppLayout() {
         {/* ==================== PAYMENT SUCCESS ==================== */}
         <Route path="/payment/success" element={<PaymentSuccess />} />
 
-        {/* Fallback route */}
+        {/* ==================== FALLBACK ROUTE ==================== */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
@@ -161,7 +158,7 @@ function AppLayout() {
 }
 
 // ============================================================
-// App Root
+// App Root Wrapper
 // ============================================================
 export default function App() {
   return (
