@@ -1,4 +1,3 @@
-// models/Quiz.js
 import mongoose from "mongoose";
 
 const quizSchema = new mongoose.Schema(
@@ -15,5 +14,4 @@ const quizSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const Quiz = mongoose.models.Quiz || mongoose.model("Quiz", quizSchema);
-export default Quiz;
+export default mongoose.model("Quiz", quizSchema);

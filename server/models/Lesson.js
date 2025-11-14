@@ -1,15 +1,14 @@
-// models/Lesson.js
 import mongoose from "mongoose";
 
 const lessonSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
-    description: String,
-    videoUrl: String, // hosted video (YouTube, Vimeo, Cloudinary, etc.)
-    duration: String, // optional e.g. "15 min"
+    type: { type: String, enum: ["video", "pdf", "text"], default: "text" },
+    url: { type: String, required: function() { return this.type !== "text"; } },
+    contentText: { type: String, required: function() { return this.type === "text"; } },
+    duration: { type: Number }, // optional, in minutes
   },
   { timestamps: true }
 );
 
-const Lesson = mongoose.models.Lesson || mongoose.model("Lesson", lessonSchema);
-export default Lesson;
+export default mongoose.model("Lesson", lessonSchema);

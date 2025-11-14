@@ -35,6 +35,9 @@ import Students from "./pages/instructor/Students";
 import Settings from "./pages/instructor/Settings";
 import ChangePassword from "./pages/instructor/changePassword";
 
+// ⭐ NEW IMPORT
+import EditCourse from "./pages/instructor/EditCourse";
+
 // ==================== Admin pages ====================
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminCourses from "./pages/Admin/courses";
@@ -115,6 +118,10 @@ function AppLayout() {
           <Route path="dashboard" element={<InstructorDashboard />} />
           <Route path="my-courses" element={<MyCourses />} />
           <Route path="create-course" element={<CreateCourse />} />
+
+          {/* ⭐ NEW EDIT COURSE ROUTE */}
+          <Route path="course/edit/:courseId" element={<EditCourse />} />
+
           <Route path="quizzes" element={<Quizzes />} />
           <Route path="students" element={<Students />} />
           <Route path="settings" element={<Settings />} />

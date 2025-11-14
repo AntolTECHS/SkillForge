@@ -6,13 +6,13 @@ const StudentCourses = () => {
   const [enrolled, setEnrolled] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [selectedLesson, setSelectedLesson] = useState(null);
 
   const rootFontStyle = {
     fontFamily:
       "'Poppins', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
   };
 
-  // Load Google font once
   useEffect(() => {
     if (!document.getElementById("gf-poppins")) {
       const link = document.createElement("link");
@@ -24,7 +24,6 @@ const StudentCourses = () => {
     }
   }, []);
 
-  // Fetch all available and enrolled courses
   const fetchCoursesAndEnrollments = async () => {
     setLoading(true);
     try {
@@ -76,6 +75,16 @@ const StudentCourses = () => {
 
   const handleStartCourse = (course) => {
     setSelectedCourse(course);
+    setSelectedLesson(null);
+  };
+
+  const handleBackToCourses = () => {
+    setSelectedCourse(null);
+    setSelectedLesson(null);
+  };
+
+  const handleBackToLessons = () => {
+    setSelectedLesson(null);
   };
 
   if (loading) {
@@ -86,77 +95,119 @@ const StudentCourses = () => {
     );
   }
 
-  // Determine courses not enrolled in
   const enrolledIds = new Set(enrolled.map((c) => c._id));
   const recommended = courses.filter((c) => !enrolledIds.has(c._id));
 
-  // Course detail page
-  if (selectedCourse) {
+  // === LESSON CONTENT VIEW ===
+  if (selectedCourse && selectedLesson) {
     return (
       <div className="p-6" style={rootFontStyle}>
         <button
-          onClick={() => setSelectedCourse(null)}
-          className="mb-6 px-4 py-2 bg-gray-200 rounded-lg"
+          onClick={handleBackToLessons}
+          className="mb-6 px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
         >
-          ← Back to Courses
+          ← Back to Lessons
         </button>
 
-        <div className="flex flex-col md:flex-row items-start gap-6 mb-6 border rounded-2xl p-6 bg-white shadow-md">
-          {selectedCourse.image && (
-            <img
-              src={selectedCourse.image}
-              alt={selectedCourse.title}
-              className="w-full md:w-64 h-40 object-cover rounded-lg"
-            />
-          )}
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold mb-2">{selectedCourse.title}</h1>
-            <p className="text-gray-700">{selectedCourse.description}</p>
-          </div>
-        </div>
+        <h1 className="text-2xl font-bold mb-4">{selectedLesson.title}</h1>
 
-        <div className="space-y-4">
-          {selectedCourse.content?.map((lesson, idx) => (
-            <div
-              key={`${selectedCourse._id}-${idx}`}
-              className="border p-4 rounded-lg bg-gray-50"
-            >
-              <div className="flex justify-between items-center mb-2">
-                <h2 className="font-semibold">{lesson.title}</h2>
-                <span className="text-sm text-gray-500">{lesson.type}</span>
-              </div>
+        {selectedLesson.type === "video" && selectedLesson.url && (
+          <video
+            src={selectedLesson.url}
+            controls
+            className="w-full rounded-xl shadow-md"
+          />
+        )}
 
-              {lesson.type === "video" && lesson.url && (
-                <video src={lesson.url} controls className="w-full rounded" />
-              )}
-              {lesson.type === "pdf" && lesson.url && (
-                <a
-                  href={lesson.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  View PDF
-                </a>
-              )}
-              {lesson.type === "text" && lesson.contentText && (
-                <p className="whitespace-pre-wrap">{lesson.contentText}</p>
-              )}
-            </div>
-          ))}
-        </div>
+        {selectedLesson.type === "pdf" && selectedLesson.url && (
+          <a
+            href={selectedLesson.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:underline"
+          >
+            View PDF
+          </a>
+        )}
+
+        {selectedLesson.type === "text" && selectedLesson.contentText && (
+          <p className="whitespace-pre-wrap text-gray-800 leading-relaxed bg-gray-50 p-4 rounded-lg border">
+            {selectedLesson.contentText}
+          </p>
+        )}
       </div>
     );
   }
 
-  // Main “Explore Courses” Page
+  // === LESSON LIST VIEW ===
+  if (selectedCourse) {
+    return (
+      <div className="p-6" style={rootFontStyle}>
+        <button
+          onClick={handleBackToCourses}
+          className="mb-6 px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
+        >
+          ← Back to Courses
+        </button>
+
+        {/* ✨ Styled Course Info Card */}
+        <div className="relative overflow-hidden rounded-2xl p-6 shadow-lg mb-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-100">
+          {selectedCourse.image && (
+            <img
+              src={selectedCourse.image}
+              alt={selectedCourse.title}
+              className="w-full md:w-72 h-44 object-cover rounded-xl shadow-md mb-5"
+            />
+          )}
+
+          <div className="space-y-3">
+            <h1 className="text-3xl font-bold text-gray-900">
+              {selectedCourse.title}
+            </h1>
+            <p className="text-gray-700 leading-relaxed">
+              {selectedCourse.description}
+            </p>
+            <div className="pt-2">
+              <span className="inline-block bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-sm">
+                {selectedCourse.category || "General"}
+              </span>
+            </div>
+          </div>
+
+          <div className="absolute inset-0 pointer-events-none opacity-10 bg-gradient-to-br from-blue-400 via-purple-300 to-pink-300"></div>
+        </div>
+
+        <h2 className="text-xl font-semibold mb-4">Course Lessons</h2>
+        {selectedCourse.content?.length ? (
+          <div className="space-y-3">
+            {selectedCourse.content.map((lesson, idx) => (
+              <div
+                key={idx}
+                onClick={() => setSelectedLesson(lesson)}
+                className="p-4 bg-gray-50 rounded-xl border cursor-pointer hover:bg-gray-100 transition"
+              >
+                <h3 className="font-semibold text-gray-800">{lesson.title}</h3>
+                <p className="text-sm text-gray-500 capitalize">{lesson.type}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500 italic">No lessons available yet.</p>
+        )}
+      </div>
+    );
+  }
+
+  // === MAIN COURSE PAGE ===
   return (
     <div className="p-4 sm:p-6" style={rootFontStyle}>
       <h1 className="text-2xl sm:text-3xl font-bold mb-4">Explore Courses</h1>
 
       {/* Enrolled Modules */}
       <section className="mb-10">
-        <h2 className="text-lg sm:text-xl font-semibold mb-4">Enrolled Modules</h2>
+        <h2 className="text-lg sm:text-xl font-semibold mb-4">
+          Enrolled Modules
+        </h2>
 
         {enrolled.length === 0 ? (
           <p className="text-gray-500 italic">
@@ -167,7 +218,8 @@ const StudentCourses = () => {
             {enrolled.map((course) => (
               <div
                 key={course._id}
-                className="flex items-center gap-4 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow w-full"
+                onClick={() => handleStartCourse(course)}
+                className="flex items-center gap-4 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition cursor-pointer w-full"
               >
                 {course.image && (
                   <img
@@ -211,7 +263,7 @@ const StudentCourses = () => {
             {recommended.map((course) => (
               <div
                 key={course._id}
-                className="flex items-center gap-4 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow w-full"
+                className="flex items-center gap-4 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition w-full"
               >
                 {course.image && (
                   <img

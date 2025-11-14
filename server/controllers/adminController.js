@@ -9,19 +9,14 @@ import { generateRandomPassword } from "../utils/randomPassword.js";
 import { sendEmail } from "../utils/sendEmail.js";
 
 /* =========================================================
-   ⚙️ Utility: Async Wrapper
+   ⚙️ Async Handler
    ========================================================= */
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
 /* =========================================================
-   👩‍🏫 INSTRUCTOR & USER MANAGEMENT (Updated)
-   - Adds one-time temp password handling for instructors
-   - Safer responses (no raw password logging)
-   - Pagination and sensitive-field filtering
+   👩‍🏫 INSTRUCTOR MANAGEMENT
    ========================================================= */
-
-// Create instructor with a one-time temporary password (emailed)
 export const addInstructor = asyncHandler(async (req, res) => {
   const { name, email } = req.body;
   if (!name || !email)
@@ -31,11 +26,7 @@ export const addInstructor = asyncHandler(async (req, res) => {
   if (existingUser)
     return res.status(400).json({ message: "User with this email already exists" });
 
-  // 1) generate a one-time temp password (plain text)
-  const tempPlain = generateRandomPassword(); // e.g., util returns a secure password
-
-  // 2) create a long placeholder permanent password to satisfy your schema
-  //    placeholder is random and not shared with instructor
+  const tempPlain = generateRandomPassword();
   const placeholderPermanent = crypto.randomBytes(32).toString("hex");
 
   const instructor = new User({
@@ -47,20 +38,17 @@ export const addInstructor = asyncHandler(async (req, res) => {
     isFirstLogin: true,
   });
 
-  // 3) attach temp password and expiry (model pre-save will hash tempPasswordHash)
-  instructor.setTempPassword(tempPlain, 7); // expiryDays = 7 (configurable)
-
+  instructor.setTempPassword(tempPlain, 7);
   await instructor.save();
 
-  // 4) send email (do not log raw password)
   try {
     await sendEmail({
       to: email,
       subject: "Your Instructor Account — One-time Login Password",
-      text: `Hello ${name},\n\nYour instructor account has been created.\n\nUse the one-time password below to log in (this password will expire in 7 days):\n\nOne-time password: ${tempPlain}\n\nAfter logging in you will be required to change your password.\n\n— LearnSphere Team`,
+      text: `Hello ${name},\n\nYour instructor account has been created.\n\nUse this one-time password (expires in 7 days):\n\n${tempPlain}\n\nAfter login, you must change your password.`,
     });
   } catch (emailError) {
-    console.warn("⚠️ Email sending failed for instructor creation:", emailError.message);
+    console.warn("⚠️ Email sending failed:", emailError.message);
   }
 
   res.status(201).json({
@@ -75,27 +63,20 @@ export const addInstructor = asyncHandler(async (req, res) => {
   });
 });
 
-// Get paginated instructors (exclude sensitive fields)
 export const getAllInstructors = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20 } = req.query;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
   const skip = (page - 1) * limit;
 
   const [instructors, total] = await Promise.all([
-    User.find({ role: "instructor", isDeleted: { $ne: true } })
+    User.find({ role: "instructor" })
       .select("-password -tempPasswordHash -tempPasswordExpiry -__v")
       .skip(skip)
-      .limit(Number(limit)),
-    User.countDocuments({ role: "instructor", isDeleted: { $ne: true } }),
+      .limit(limit),
+    User.countDocuments({ role: "instructor" }),
   ]);
 
-  if (!instructors.length) return res.status(404).json({ message: "No instructors found" });
-
-  res.json({
-    instructors,
-    total,
-    page: Number(page),
-    pages: Math.ceil(total / limit),
-  });
+  res.json({ instructors, total, page, pages: Math.ceil(total / limit) });
 });
 
 export const deleteInstructor = asyncHandler(async (req, res) => {
@@ -103,79 +84,74 @@ export const deleteInstructor = asyncHandler(async (req, res) => {
   if (!instructor || instructor.role !== "instructor")
     return res.status(404).json({ message: "Instructor not found" });
 
-  // Soft-delete pattern: mark isDeleted to true so related courses remain
-  instructor.isDeleted = true;
-  instructor.isActive = false;
-  await instructor.save();
+  await Promise.all([
+    Enrollment.deleteMany({ student: instructor._id }),
+    Payment.deleteMany({ user: instructor._id }),
+    Certificate.deleteMany({ user: instructor._id }),
+  ]);
 
-  res.json({ message: "Instructor soft-deleted successfully (courses retained)" });
+  await instructor.deleteOne();
+
+  res.json({ message: "Instructor hard-deleted successfully" });
 });
 
 /* =========================================================
    👥 USER MANAGEMENT
    ========================================================= */
 export const getAllUsers = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20 } = req.query;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
   const skip = (page - 1) * limit;
 
   const [users, total] = await Promise.all([
-    User.find({ isDeleted: { $ne: true } })
+    User.find()
       .select("-password -tempPasswordHash -tempPasswordExpiry -__v")
       .skip(skip)
-      .limit(Number(limit)),
-    User.countDocuments({ isDeleted: { $ne: true } }),
+      .limit(limit),
+    User.countDocuments(),
   ]);
 
-  if (!users.length) return res.status(404).json({ message: "No users found" });
-
-  res.json({ users, total, page: Number(page), pages: Math.ceil(total / limit) });
+  res.json({ users, total, page, pages: Math.ceil(total / limit) });
 });
 
 export const deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) return res.status(404).json({ message: "User not found" });
 
-  // Cleanup related data
   await Promise.all([
-    Enrollment.deleteMany({ user: user._id }),
+    Enrollment.deleteMany({ student: user._id }),
     Payment.deleteMany({ user: user._id }),
     Certificate.deleteMany({ user: user._id }),
   ]);
 
-  // Soft-delete user for safety
-  user.isDeleted = true;
-  user.isActive = false;
-  await user.save();
+  await user.deleteOne();
 
-  res.json({ message: "User and related data soft-deleted successfully" });
+  res.json({ message: "User and related data hard-deleted successfully" });
 });
 
 /* =========================================================
    📚 COURSE MANAGEMENT
    ========================================================= */
 export const getAllCourses = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20 } = req.query;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
   const skip = (page - 1) * limit;
 
   const [courses, total] = await Promise.all([
     Course.find()
       .populate("instructor", "name email")
-      .populate("category", "name")
       .skip(skip)
-      .limit(Number(limit)),
+      .limit(limit),
     Course.countDocuments(),
   ]);
 
-  if (!courses.length) return res.status(404).json({ message: "No courses found" });
-
-  res.json({ courses, total, page: Number(page), pages: Math.ceil(total / limit) });
+  res.json({ courses, total, page, pages: Math.ceil(total / limit) });
 });
 
 export const deleteCourse = asyncHandler(async (req, res) => {
   const course = await Course.findById(req.params.id);
   if (!course) return res.status(404).json({ message: "Course not found" });
 
-  // Remove enrollments, payments, and certificates related to this course
   await Promise.all([
     Enrollment.deleteMany({ course: course._id }),
     Payment.deleteMany({ course: course._id }),
@@ -183,14 +159,16 @@ export const deleteCourse = asyncHandler(async (req, res) => {
   ]);
 
   await course.deleteOne();
-  res.json({ message: "Course and related data deleted successfully" });
+
+  res.json({ message: "Course and related data hard-deleted successfully" });
 });
 
 /* =========================================================
-   💳 PAYMENT MANAGEMENT (with pagination)
+   💳 PAYMENT MANAGEMENT
    ========================================================= */
 export const getAllPayments = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20 } = req.query;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
   const skip = (page - 1) * limit;
 
   const [payments, total] = await Promise.all([
@@ -199,13 +177,11 @@ export const getAllPayments = asyncHandler(async (req, res) => {
       .populate("course", "title price")
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(Number(limit)),
+      .limit(limit),
     Payment.countDocuments(),
   ]);
 
-  if (!payments.length) return res.status(404).json({ message: "No payments found" });
-
-  res.json({ payments, total, page: Number(page), pages: Math.ceil(total / limit) });
+  res.json({ payments, total, page, pages: Math.ceil(total / limit) });
 });
 
 /* =========================================================
@@ -217,34 +193,31 @@ export const getAllCertificates = asyncHandler(async (req, res) => {
     .populate("course", "title")
     .sort({ createdAt: -1 });
 
-  if (!certificates.length) return res.status(404).json({ message: "No certificates found" });
-
   res.json(certificates);
 });
 
 /* =========================================================
-   🧾 ENROLLMENTS, ATTENDANCE, ASSIGNMENTS
+   🧾 ENROLLMENTS
    ========================================================= */
 export const getAllEnrollments = asyncHandler(async (req, res) => {
-  const enrollments = await Enrollment.find()
-    .populate("user", "name email")
-    .populate("course", "title");
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 100;
+  const skip = (page - 1) * limit;
 
-  if (!enrollments.length) return res.status(404).json({ message: "No enrollments found" });
+  const [enrollments, total] = await Promise.all([
+    Enrollment.find()
+      .populate("student", "name email")
+      .populate("course", "title")
+      .skip(skip)
+      .limit(limit),
+    Enrollment.countDocuments(),
+  ]);
 
-  res.json(enrollments);
-});
-
-export const getAllAttendance = asyncHandler(async (req, res) => {
-  res.json([]); // Placeholder for future logic
-});
-
-export const getAllAssignments = asyncHandler(async (req, res) => {
-  res.json([]); // Placeholder for future logic
+  res.json({ enrollments, total, page, limit, pages: Math.ceil(total / limit) });
 });
 
 /* =========================================================
-   📊 DASHBOARD OVERVIEW (Enhanced)
+   📊 DASHBOARD OVERVIEW
    ========================================================= */
 export const getOverview = asyncHandler(async (req, res) => {
   const [
@@ -254,17 +227,13 @@ export const getOverview = asyncHandler(async (req, res) => {
     coursesCount,
     enrollmentsCount,
     totalRevenueResult,
-    recentEnrollments,
   ] = await Promise.all([
-    User.countDocuments({ isDeleted: { $ne: true } }),
-    User.countDocuments({ role: "student", isDeleted: { $ne: true } }),
-    User.countDocuments({ role: "instructor", isDeleted: { $ne: true } }),
+    User.countDocuments(),
+    User.countDocuments({ role: "student" }),
+    User.countDocuments({ role: "instructor" }),
     Course.countDocuments(),
     Enrollment.countDocuments(),
     Payment.aggregate([{ $group: { _id: null, total: { $sum: "$amount" } } }]),
-    Enrollment.countDocuments({
-      createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-    }),
   ]);
 
   const totalRevenue = totalRevenueResult[0]?.total || 0;
@@ -275,7 +244,6 @@ export const getOverview = asyncHandler(async (req, res) => {
     instructors: instructorsCount,
     courses: coursesCount,
     enrollments: enrollmentsCount,
-    recentEnrollments,
     revenue: totalRevenue,
   });
 });
@@ -291,7 +259,5 @@ export default {
   getAllPayments,
   getAllCertificates,
   getAllEnrollments,
-  getAllAttendance,
-  getAllAssignments,
   getOverview,
 };

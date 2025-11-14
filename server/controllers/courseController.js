@@ -1,4 +1,3 @@
-// server/controllers/courseController.js
 import Course from "../models/Course.js";
 
 /**
@@ -8,11 +7,12 @@ export const createCourse = async (req, res) => {
   try {
     const { title, description, price, category } = req.body;
 
-    // Parse lesson content JSON safely
-    const content = JSON.parse(req.body.content || "[]");
+    // Parse lesson content and quizzes safely
+    const content = JSON.parse(req.body.content || "[]"); // lessons
+    const quizzes = JSON.parse(req.body.quizzes || "[]"); // quizzes
 
-    // Handle lesson files
-    const lessonFiles = req.files?.files || [];
+    // Handle lesson files (video/pdf)
+    const lessonFiles = req.files?.lessons || [];
     const updatedContent = content.map((lesson, idx) => {
       if ((lesson.type === "video" || lesson.type === "pdf") && lessonFiles[idx]) {
         lesson.url = `${req.protocol}://${req.get("host")}/uploads/${lessonFiles[idx].filename}`;
@@ -35,6 +35,7 @@ export const createCourse = async (req, res) => {
       category,
       image: imageUrl,
       content: updatedContent,
+      quizzes,
       instructor: req.user._id,
     });
 
@@ -50,7 +51,9 @@ export const createCourse = async (req, res) => {
  */
 export const getCourses = async (req, res) => {
   try {
-    const courses = await Course.find().populate("instructor", "name email").lean();
+    const courses = await Course.find()
+      .populate("instructor", "name email")
+      .lean();
 
     const coursesWithUrls = courses.map((course) => ({
       ...course,
@@ -83,7 +86,9 @@ export const getCourses = async (req, res) => {
  */
 export const getAvailableCourses = async (req, res) => {
   try {
-    const courses = await Course.find().populate("instructor", "name email").lean();
+    const courses = await Course.find()
+      .populate("instructor", "name email")
+      .lean();
 
     const coursesWithUrls = courses.map((course) => ({
       ...course,

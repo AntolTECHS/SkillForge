@@ -73,7 +73,7 @@ app.get("/", (req, res) => {
 // ✅ Register API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/instructors", instructorRoutes);
+app.use("/api/instructor", instructorRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/payment", paymentRoutes);

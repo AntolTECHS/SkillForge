@@ -1,20 +1,24 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, BookOpen, PlusCircle, ClipboardList, Users, Settings } from "lucide-react";
+import { Home, BookOpen, PlusCircle, Users, Settings } from "lucide-react";
 
 const InstructorSidebar = () => {
   const location = useLocation();
+
+  const pageFont = {
+    fontFamily:
+      "'Poppins', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
+  };
 
   const tabs = [
     { name: "Dashboard", icon: Home, path: "/instructor/dashboard" },
     { name: "My Courses", icon: BookOpen, path: "/instructor/my-courses" },
     { name: "Create Course", icon: PlusCircle, path: "/instructor/create-course" },
-    { name: "Quizzes", icon: ClipboardList, path: "/instructor/quizzes" },
     { name: "Students", icon: Users, path: "/instructor/students" },
     { name: "Settings", icon: Settings, path: "/instructor/settings" },
   ];
 
   return (
-    <aside className="w-64 bg-white shadow-md min-h-screen flex flex-col pt-20">
+    <aside className="w-64 bg-white shadow-md min-h-screen flex flex-col pt-20" style={pageFont}>
       <nav className="flex flex-col gap-2 px-4">
         {tabs.map((tab) => {
           const Icon = tab.icon;

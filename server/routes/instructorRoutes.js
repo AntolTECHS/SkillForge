@@ -1,68 +1,75 @@
-// routes/instructorRoutes.js
-
+// server/routes/instructorRoutes.js
 import express from "express";
+import multer from "multer";
 import {
   createCourse,
   updateCourse,
   publishCourse,
   getMyCourses,
   getCourseById,
-  addModule,
-  addLesson,
   addQuiz,
   deleteCourse,
+  getStudentsForInstructor,
+  getProfile,
+  updateProfile,
 } from "../controllers/instructorController.js";
-import { protect } from "../middlewares/authMiddleware.js";
+
+import { protect, allowWeakAuth } from "../middlewares/authMiddleware.js";
 import { authorizeRoles } from "../middlewares/roleMiddleware.js";
 
 const router = express.Router();
 
-/* =========================================================
-   🔒 Middleware Protection
-   ========================================================= */
-// ✅ All instructor routes are protected and require the instructor role
-router.use(protect, authorizeRoles("instructor"));
+// -------------------- Multer Setup --------------------
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + "-" + file.originalname);
+  },
+});
+const upload = multer({ storage });
 
-/* =========================================================
-   📘 Course Management
-   ========================================================= */
+// -------------------- PROTECTED ROUTES --------------------
+// Full authentication required + instructor role
+router.post("/courses", protect, authorizeRoles("instructor"), createCourse);
 
-// ➕ Create a new course
-router.post("/courses", createCourse);
+router.put(
+  "/courses/:courseId",
+  protect,
+  authorizeRoles("instructor"),
+  upload.single("thumbnail"),
+  updateCourse
+);
 
-// ✏️ Update course details
-router.put("/courses/:courseId", updateCourse);
+router.delete(
+  "/courses/:courseId",
+  protect,
+  authorizeRoles("instructor"),
+  deleteCourse
+);
 
-// 🗑️ Delete a course (optional but often useful)
-router.delete("/courses/:courseId", deleteCourse);
+router.patch(
+  "/courses/:courseId/status",
+  protect,
+  authorizeRoles("instructor"),
+  publishCourse
+);
 
-// 🚀 Publish or unpublish course
-router.patch("/courses/:courseId/status", publishCourse);
+router.post(
+  "/courses/:courseId/quizzes",
+  protect,
+  authorizeRoles("instructor"),
+  addQuiz
+);
 
-// 👀 Get all courses belonging to the logged-in instructor
-router.get("/my-courses", getMyCourses);
+// -------------------- PROFILE ROUTES --------------------
+router.get("/profile", protect, authorizeRoles("instructor"), getProfile);
+router.put("/profile", protect, authorizeRoles("instructor"), updateProfile);
 
-// 👁️ Get a specific course with details (modules, lessons, quizzes)
-router.get("/courses/:courseId", getCourseById);
+// -------------------- WEAK AUTH ROUTES --------------------
+// Allow access even if first-login or forcePasswordChange
+router.get("/my-courses", allowWeakAuth, getMyCourses);
+router.get("/students", allowWeakAuth, getStudentsForInstructor);
+router.get("/courses/:courseId", allowWeakAuth, getCourseById);
 
-/* =========================================================
-   📦 Module & Lesson Management
-   ========================================================= */
-
-// ➕ Add a new module to a course
-router.post("/courses/:courseId/modules", addModule);
-
-// ➕ Add a lesson under a specific module
-router.post("/courses/:courseId/modules/:moduleId/lessons", addLesson);
-
-/* =========================================================
-   🧠 Quiz Management
-   ========================================================= */
-
-// ➕ Add a quiz under a specific module
-router.post("/courses/:courseId/modules/:moduleId/quizzes", addQuiz);
-
-/* =========================================================
-   🧩 Export
-   ========================================================= */
 export default router;

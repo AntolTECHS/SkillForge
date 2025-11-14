@@ -1,14 +1,13 @@
-// models/Module.js
 import mongoose from "mongoose";
 
 const moduleSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
-    description: String,
+    description: { type: String },
     lessons: [{ type: mongoose.Schema.Types.ObjectId, ref: "Lesson" }],
+    quizzes: [{ type: mongoose.Schema.Types.ObjectId, ref: "Quiz" }],
   },
   { timestamps: true }
 );
 
-const Module = mongoose.models.Module || mongoose.model("Module", moduleSchema);
-export default Module;
+export default mongoose.model("Module", moduleSchema);
