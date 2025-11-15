@@ -12,7 +12,7 @@ export const createCourse = async (req, res) => {
     const quizzes = JSON.parse(req.body.quizzes || "[]"); // quizzes
 
     // Handle lesson files (video/pdf)
-    const lessonFiles = req.files?.lessons || [];
+    const lessonFiles = req.files?.files || [];
     const updatedContent = content.map((lesson, idx) => {
       if ((lesson.type === "video" || lesson.type === "pdf") && lessonFiles[idx]) {
         lesson.url = `${req.protocol}://${req.get("host")}/uploads/${lessonFiles[idx].filename}`;
@@ -113,5 +113,43 @@ export const getAvailableCourses = async (req, res) => {
   } catch (err) {
     console.error("Get available courses error:", err);
     res.status(500).json({ message: "Failed to fetch courses for students" });
+  }
+};
+
+/**
+ * @desc    Get a single course by ID (full details)
+ */
+export const getCourseById = async (req, res) => {
+  try {
+    const course = await Course.findById(req.params.id)
+      .populate("instructor", "name email")
+      .lean();
+
+    if (!course) return res.status(404).json({ message: "Course not found" });
+
+    // Ensure URLs are absolute
+    const courseWithUrls = {
+      ...course,
+      image: course.image
+        ? course.image.startsWith("http")
+          ? course.image
+          : `${req.protocol}://${req.get("host")}${course.image}`
+        : "",
+      content: Array.isArray(course.content)
+        ? course.content.map((lesson) => ({
+            ...lesson,
+            url: lesson.url
+              ? lesson.url.startsWith("http")
+                ? lesson.url
+                : `${req.protocol}://${req.get("host")}${lesson.url}`
+              : "",
+          }))
+        : [],
+    };
+
+    res.json(courseWithUrls);
+  } catch (err) {
+    console.error("Get course by ID error:", err);
+    res.status(500).json({ message: "Failed to fetch course" });
   }
 };

@@ -27,17 +27,35 @@ const storage = multer.diskStorage({
     cb(null, uniqueSuffix + "-" + file.originalname);
   },
 });
+
 const upload = multer({ storage });
 
-// -------------------- PROTECTED ROUTES --------------------
-// Full authentication required + instructor role
-router.post("/courses", protect, authorizeRoles("instructor"), createCourse);
+// -------------------- PROFILE ROUTES --------------------
+// Only full instructor access
+router.get("/profile", protect, authorizeRoles("instructor"), getProfile);
+router.put("/profile", protect, authorizeRoles("instructor"), updateProfile);
+
+// -------------------- COURSE ROUTES --------------------
+// Instructor only
+router.post(
+  "/courses",
+  protect,
+  authorizeRoles("instructor"),
+  upload.fields([
+    { name: "thumbnail", maxCount: 1 },
+    { name: "lessonFiles" }
+  ]),
+  createCourse
+);
 
 router.put(
   "/courses/:courseId",
   protect,
   authorizeRoles("instructor"),
-  upload.single("thumbnail"),
+  upload.fields([
+    { name: "thumbnail", maxCount: 1 },
+    { name: "lessonFiles" }
+  ]),
   updateCourse
 );
 
@@ -62,14 +80,10 @@ router.post(
   addQuiz
 );
 
-// -------------------- PROFILE ROUTES --------------------
-router.get("/profile", protect, authorizeRoles("instructor"), getProfile);
-router.put("/profile", protect, authorizeRoles("instructor"), updateProfile);
-
-// -------------------- WEAK AUTH ROUTES --------------------
-// Allow access even if first-login or forcePasswordChange
-router.get("/my-courses", allowWeakAuth, getMyCourses);
-router.get("/students", allowWeakAuth, getStudentsForInstructor);
-router.get("/courses/:courseId", allowWeakAuth, getCourseById);
+// -------------------- INSTRUCTOR'S COURSES & STUDENTS --------------------
+// Only instructors (full auth)
+router.get("/my-courses", protect, authorizeRoles("instructor"), getMyCourses);
+router.get("/students", protect, authorizeRoles("instructor"), getStudentsForInstructor);
+router.get("/courses/:courseId", protect, authorizeRoles("instructor"), getCourseById);
 
 export default router;

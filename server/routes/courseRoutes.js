@@ -1,5 +1,10 @@
 import express from "express";
-import { createCourse, getCourses, getAvailableCourses } from "../controllers/courseController.js";
+import { 
+  createCourse, 
+  getCourses, 
+  getAvailableCourses,
+  getCourseById // new controller
+} from "../controllers/courseController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import multer from "multer";
 import path from "path";
@@ -28,5 +33,8 @@ const upload = multer({ storage }).fields([
 router.post("/", protect, upload, createCourse);
 router.get("/", getCourses);
 router.get("/available", getAvailableCourses);
+
+// NEW: Get single course by ID
+router.get("/:id", getCourseById);
 
 export default router;

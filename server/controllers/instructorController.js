@@ -1,5 +1,3 @@
-// server/controllers/instructorController.js
-
 import Course from "../models/Course.js";
 import Quiz from "../models/Quiz.js";
 import Enrollment from "../models/Enrollment.js";
@@ -7,9 +5,8 @@ import User from "../models/User.js";
 
 /* ============================================================
    🧑‍💼 Instructor Profile
-   ============================================================ */
+============================================================ */
 
-// Get instructor profile
 export const getProfile = async (req, res) => {
   try {
     const { name, email, notifications, darkMode } = req.user;
@@ -23,7 +20,6 @@ export const getProfile = async (req, res) => {
   }
 };
 
-// Update instructor profile
 export const updateProfile = async (req, res) => {
   try {
     const { name, email, notifications, darkMode } = req.body;
@@ -35,10 +31,7 @@ export const updateProfile = async (req, res) => {
 
     await req.user.save();
 
-    res.status(200).json({
-      success: true,
-      profile: req.user,
-    });
+    res.status(200).json({ success: true, profile: req.user });
   } catch (err) {
     console.error("❌ Error updating profile:", err);
     res.status(500).json({ success: false, message: "Error updating profile" });
@@ -47,20 +40,17 @@ export const updateProfile = async (req, res) => {
 
 /* ============================================================
    📘 Courses CRUD
-   ============================================================ */
+============================================================ */
 
-// Create a new course
 export const createCourse = async (req, res) => {
   try {
-    const { title, description, thumbnail, price, category, level, duration } = req.body;
-
+    const { title, description, price, category, level, duration } = req.body;
     if (!title || !description)
       return res.status(400).json({ success: false, message: "Title and description are required" });
 
-    const course = await Course.create({
+    const course = new Course({
       title,
       description,
-      thumbnail,
       price,
       category,
       level,
@@ -68,7 +58,25 @@ export const createCourse = async (req, res) => {
       instructor: req.user._id,
       isPublished: false,
       quizzes: [],
+      content: [],
+      image: "", // unified field for thumbnail
     });
+
+    // Handle course image
+    if (req.files?.thumbnail?.[0]) {
+      course.image = `${req.protocol}://${req.get("host")}/uploads/${req.files.thumbnail[0].filename}`;
+    }
+
+    // Handle lesson files
+    if (req.files?.lessonFiles) {
+      course.content = req.files.lessonFiles.map((file) => ({
+        title: "",
+        type: file.mimetype.startsWith("video") ? "video" : "file",
+        url: `${req.protocol}://${req.get("host")}/uploads/${file.filename}`,
+      }));
+    }
+
+    await course.save();
 
     res.status(201).json({ success: true, message: "✅ Course created successfully", course });
   } catch (err) {
@@ -77,45 +85,74 @@ export const createCourse = async (req, res) => {
   }
 };
 
-// Update existing course
 export const updateCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const updates = req.body;
+    const course = await Course.findById(courseId);
+    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
+    if (!course.instructor.equals(req.user._id))
+      return res.status(403).json({ success: false, message: "Not authorized to edit this course" });
 
-    const course = await Course.findOneAndUpdate(
-      { _id: courseId, instructor: req.user._id },
-      updates,
-      { new: true }
-    );
+    // Update basic fields
+    const fields = ["title", "description", "price", "category", "level", "duration"];
+    fields.forEach((field) => {
+      if (req.body[field] !== undefined) course[field] = req.body[field];
+    });
 
-    if (!course)
-      return res.status(404).json({ success: false, message: "Course not found or not owned by you" });
+    // Update content JSON
+    if (req.body.content) {
+      try {
+        const parsedContent = JSON.parse(req.body.content);
+        if (req.files?.lessonFiles) {
+          req.files.lessonFiles.forEach((file, idx) => {
+            if (parsedContent[idx]) {
+              parsedContent[idx].url = `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
+            }
+          });
+        }
+        course.content = parsedContent;
+      } catch {
+        return res.status(400).json({ success: false, message: "Invalid JSON for content" });
+      }
+    }
 
-    res.status(200).json({ success: true, message: "Course updated", course });
+    // Update quizzes JSON
+    if (req.body.quizzes) {
+      try {
+        course.quizzes = JSON.parse(req.body.quizzes);
+      } catch {
+        return res.status(400).json({ success: false, message: "Invalid JSON for quizzes" });
+      }
+    }
+
+    // Update course image
+    if (req.files?.thumbnail?.[0]) {
+      course.image = `${req.protocol}://${req.get("host")}/uploads/${req.files.thumbnail[0].filename}`;
+    }
+
+    await course.save();
+
+    res.status(200).json({ success: true, message: "Course updated successfully", course });
   } catch (err) {
     console.error("❌ Error updating course:", err);
     res.status(500).json({ success: false, message: "Error updating course" });
   }
 };
 
-// Publish / Unpublish Course
 export const publishCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const course = await Course.findOne({ _id: courseId, instructor: req.user._id });
-
-    if (!course)
-      return res.status(404).json({ success: false, message: "Course not found or not yours" });
+    const course = await Course.findById(courseId);
+    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
+    if (!course.instructor.equals(req.user._id))
+      return res.status(403).json({ success: false, message: "Not authorized to change publish status" });
 
     course.isPublished = !course.isPublished;
     await course.save();
 
     res.status(200).json({
       success: true,
-      message: course.isPublished
-        ? "🎉 Course published successfully!"
-        : "🚫 Course unpublished successfully!",
+      message: course.isPublished ? "🎉 Course published successfully!" : "🚫 Course unpublished successfully!",
       course,
     });
   } catch (err) {
@@ -124,20 +161,16 @@ export const publishCourse = async (req, res) => {
   }
 };
 
-// Delete a Course (HARD DELETE)
 export const deleteCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const course = await Course.findOne({ _id: courseId, instructor: req.user._id });
+    const course = await Course.findById(courseId);
+    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
+    if (!course.instructor.equals(req.user._id))
+      return res.status(403).json({ success: false, message: "Not authorized to delete this course" });
 
-    if (!course)
-      return res.status(404).json({ success: false, message: "Course not found or not yours" });
-
-    // Delete quizzes and enrollments
     await Quiz.deleteMany({ _id: { $in: course.quizzes } });
     await Enrollment.deleteMany({ course: course._id });
-
-    // Delete the course itself
     await course.deleteOne();
 
     res.status(200).json({ success: true, message: "🗑️ Course deleted successfully" });
@@ -148,25 +181,27 @@ export const deleteCourse = async (req, res) => {
 };
 
 /* ============================================================
-   🎓 Instructor's Courses (paginated)
-   ============================================================ */
+   🎓 Instructor Courses Paginated
+============================================================ */
+
 export const getMyCourses = async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
     const skip = (page - 1) * limit;
 
     const [courses, total] = await Promise.all([
-      Course.find({ instructor: req.user._id })
-        .populate("quizzes")
-        .skip(skip)
-        .limit(Number(limit)),
+      Course.find({ instructor: req.user._id }).populate("quizzes").skip(skip).limit(Number(limit)),
       Course.countDocuments({ instructor: req.user._id }),
     ]);
 
     const coursesWithStudentCount = await Promise.all(
       courses.map(async (course) => {
         const studentsCount = await Enrollment.countDocuments({ course: course._id });
-        return { ...course.toObject(), studentsCount };
+        return {
+          ...course.toObject(),
+          studentsCount,
+          image: course.image || null,
+        };
       })
     );
 
@@ -183,22 +218,21 @@ export const getMyCourses = async (req, res) => {
   }
 };
 
-// Get a specific course by ID
 export const getCourseById = async (req, res) => {
   try {
     const { courseId } = req.params;
     const course = await Course.findById(courseId)
       .populate("quizzes")
-      .populate({
-        path: "studentsEnrolled",
-        select: "name email",
-      });
+      .populate({ path: "studentsEnrolled", select: "name email" });
 
     if (!course) return res.status(404).json({ success: false, message: "Course not found" });
-    if (req.user.role === "instructor" && !course.instructor.equals(req.user._id))
+    if (req.user?.role === "instructor" && !course.instructor.equals(req.user._id))
       return res.status(403).json({ success: false, message: "Not authorized to view this course" });
 
-    res.status(200).json({ success: true, course });
+    const courseObj = course.toObject();
+    courseObj.image = courseObj.image || null;
+
+    res.status(200).json({ success: true, course: courseObj });
   } catch (err) {
     console.error("❌ Error fetching course:", err);
     res.status(500).json({ success: false, message: "Error fetching course details" });
@@ -207,7 +241,8 @@ export const getCourseById = async (req, res) => {
 
 /* ============================================================
    🧠 Quiz Management
-   ============================================================ */
+============================================================ */
+
 export const addQuiz = async (req, res) => {
   try {
     const { courseId } = req.params;
@@ -216,8 +251,10 @@ export const addQuiz = async (req, res) => {
     if (!title || !Array.isArray(questions))
       return res.status(400).json({ success: false, message: "Quiz title and questions are required" });
 
-    const course = await Course.findOne({ _id: courseId, instructor: req.user._id });
-    if (!course) return res.status(404).json({ success: false, message: "Course not found or not yours" });
+    const course = await Course.findById(courseId);
+    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
+    if (!course.instructor.equals(req.user._id))
+      return res.status(403).json({ success: false, message: "Not authorized to add quiz to this course" });
 
     const quiz = await Quiz.create({ title, questions });
     course.quizzes.push(quiz._id);
@@ -231,9 +268,9 @@ export const addQuiz = async (req, res) => {
 };
 
 /* ============================================================
-   👨‍🎓 Get students enrolled in instructor's courses
-   Supports optional courseId filter
-   ============================================================ */
+   👨‍🎓 Students for Instructor
+============================================================ */
+
 export const getStudentsForInstructor = async (req, res) => {
   try {
     const { page = 1, limit = 20, courseId } = req.query;
@@ -267,5 +304,33 @@ export const getStudentsForInstructor = async (req, res) => {
   } catch (err) {
     console.error("❌ Error fetching students:", err);
     res.status(500).json({ success: false, message: "Error fetching students" });
+  }
+};
+
+/* ============================================================
+   🎓 Available Courses for Students
+============================================================ */
+
+export const getAvailableCourses = async (req, res) => {
+  try {
+    const courses = await Course.find({ isPublished: true })
+      .populate("instructor", "name email")
+      .lean();
+
+    const coursesWithUrls = courses.map((course) => ({
+      ...course,
+      image: course.image || "",
+      content: Array.isArray(course.content)
+        ? course.content.map((lesson) => ({
+            ...lesson,
+            url: lesson.url || "",
+          }))
+        : [],
+    }));
+
+    res.json({ courses: coursesWithUrls });
+  } catch (err) {
+    console.error("❌ Error fetching courses for students:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch courses for students" });
   }
 };

@@ -13,6 +13,7 @@ const StudentCourses = () => {
       "'Poppins', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
   };
 
+  // Load Poppins font dynamically
   useEffect(() => {
     if (!document.getElementById("gf-poppins")) {
       const link = document.createElement("link");
@@ -24,12 +25,14 @@ const StudentCourses = () => {
     }
   }, []);
 
+  // Fetch all published courses and enrollments
   const fetchCoursesAndEnrollments = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
+
       const [coursesRes, enrollRes] = await Promise.all([
-        axios.get("http://localhost:5000/api/courses/available"),
+        axios.get("http://localhost:5000/api/courses/available"), // published courses
         axios.get("http://localhost:5000/api/enrollments", {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -58,6 +61,7 @@ const StudentCourses = () => {
     fetchCoursesAndEnrollments();
   }, []);
 
+  // Enroll in a course
   const handleEnroll = async (courseId) => {
     try {
       const token = localStorage.getItem("token");
@@ -66,7 +70,7 @@ const StudentCourses = () => {
         { courseId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      await fetchCoursesAndEnrollments();
+      await fetchCoursesAndEnrollments(); // refresh after enrollment
     } catch (err) {
       console.error("Failed to enroll", err);
       alert(err.response?.data?.message || "Enrollment failed");
@@ -87,18 +91,7 @@ const StudentCourses = () => {
     setSelectedLesson(null);
   };
 
-  if (loading) {
-    return (
-      <div className="p-6 text-gray-500" style={rootFontStyle}>
-        Loading your courses...
-      </div>
-    );
-  }
-
-  const enrolledIds = new Set(enrolled.map((c) => c._id));
-  const recommended = courses.filter((c) => !enrolledIds.has(c._id));
-
-  // === LESSON CONTENT VIEW ===
+  // === LESSON PAGE ===
   if (selectedCourse && selectedLesson) {
     return (
       <div className="p-6" style={rootFontStyle}>
@@ -119,14 +112,14 @@ const StudentCourses = () => {
           />
         )}
 
-        {selectedLesson.type === "pdf" && selectedLesson.url && (
+        {selectedLesson.type === "file" && selectedLesson.url && (
           <a
             href={selectedLesson.url}
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-600 hover:underline"
           >
-            View PDF
+            View File
           </a>
         )}
 
@@ -139,7 +132,7 @@ const StudentCourses = () => {
     );
   }
 
-  // === LESSON LIST VIEW ===
+  // === LESSON LIST ===
   if (selectedCourse) {
     return (
       <div className="p-6" style={rootFontStyle}>
@@ -150,7 +143,6 @@ const StudentCourses = () => {
           ← Back to Courses
         </button>
 
-        {/* ✨ Styled Course Info Card */}
         <div className="relative overflow-hidden rounded-2xl p-6 shadow-lg mb-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-100">
           {selectedCourse.image && (
             <img
@@ -160,21 +152,12 @@ const StudentCourses = () => {
             />
           )}
 
-          <div className="space-y-3">
-            <h1 className="text-3xl font-bold text-gray-900">
-              {selectedCourse.title}
-            </h1>
-            <p className="text-gray-700 leading-relaxed">
-              {selectedCourse.description}
-            </p>
-            <div className="pt-2">
-              <span className="inline-block bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-sm">
-                {selectedCourse.category || "General"}
-              </span>
-            </div>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">
+            {selectedCourse.title}
+          </h1>
+          <p className="text-gray-700 leading-relaxed">{selectedCourse.description}</p>
 
-          <div className="absolute inset-0 pointer-events-none opacity-10 bg-gradient-to-br from-blue-400 via-purple-300 to-pink-300"></div>
+          <div className="absolute inset-0 opacity-10 pointer-events-none bg-gradient-to-br from-blue-400 via-purple-300 to-pink-300" />
         </div>
 
         <h2 className="text-xl font-semibold mb-4">Course Lessons</h2>
@@ -186,61 +169,74 @@ const StudentCourses = () => {
                 onClick={() => setSelectedLesson(lesson)}
                 className="p-4 bg-gray-50 rounded-xl border cursor-pointer hover:bg-gray-100 transition"
               >
-                <h3 className="font-semibold text-gray-800">{lesson.title}</h3>
-                <p className="text-sm text-gray-500 capitalize">{lesson.type}</p>
+                <h3 className="font-semibold text-gray-800">{lesson.title || `Lesson ${idx + 1}`}</h3>
+                <p className="text-sm text-gray-500">{lesson.type}</p>
               </div>
             ))}
           </div>
         ) : (
           <p className="text-gray-500 italic">No lessons available yet.</p>
         )}
+
+        <h2 className="text-xl font-semibold mt-6 mb-4">Quizzes</h2>
+        {selectedCourse.quizzes?.length ? (
+          <div className="space-y-3">
+            {selectedCourse.quizzes.map((quiz, qIdx) => (
+              <div key={qIdx} className="p-4 bg-gray-50 rounded-xl border">
+                <h3 className="font-semibold text-gray-800">{quiz.title}</h3>
+                <ul className="list-disc ml-6 mt-2">
+                  {quiz.questions.map((question, idx) => (
+                    <li key={idx} className="text-gray-700">{question.question}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500 italic">No quizzes available yet.</p>
+        )}
       </div>
     );
   }
 
-  // === MAIN COURSE PAGE ===
+  // === MAIN PAGE ===
+  const enrolledIds = new Set(enrolled.map((c) => c._id));
+  const recommended = courses.filter((c) => !enrolledIds.has(c._id));
+
   return (
     <div className="p-4 sm:p-6" style={rootFontStyle}>
-      <h1 className="text-2xl sm:text-3xl font-bold mb-4">Explore Courses</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6">Explore Courses</h1>
 
-      {/* Enrolled Modules */}
-      <section className="mb-10">
-        <h2 className="text-lg sm:text-xl font-semibold mb-4">
-          Enrolled Modules
-        </h2>
+      {/* ENROLLED COURSES */}
+      <section className="mb-12">
+        <h2 className="text-lg sm:text-xl font-semibold mb-4">Enrolled Modules</h2>
 
         {enrolled.length === 0 ? (
-          <p className="text-gray-500 italic">
-            You haven’t enrolled in any modules yet.
-          </p>
+          <p className="text-gray-500 italic">You haven’t enrolled in any courses yet.</p>
         ) : (
-          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2">
             {enrolled.map((course) => (
               <div
                 key={course._id}
                 onClick={() => handleStartCourse(course)}
-                className="flex items-center gap-4 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition cursor-pointer w-full"
+                className="bg-white w-full rounded-2xl p-5 shadow-sm border border-gray-200 hover:shadow-lg transition cursor-pointer"
               >
-                {course.image && (
-                  <img
-                    src={course.image}
-                    alt={course.title}
-                    className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 object-cover rounded-lg"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-800 text-sm sm:text-base mb-1 truncate">
-                    {course.title}
-                  </h3>
-                  <div className="w-full bg-gray-200 h-2 rounded-full mb-1">
-                    <div
-                      className="bg-teal-500 h-2 rounded-full"
-                      style={{ width: `${course.progress || 0}%` }}
-                    ></div>
+                <div className="flex gap-4 items-center">
+                  {course.image && (
+                    <img
+                      src={course.image}
+                      alt={course.title}
+                      className="w-20 h-20 object-cover rounded-xl shadow"
+                    />
+                  )}
+
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 mb-2">{course.title}</h3>
+                    <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                      <div className="bg-teal-600 h-2" style={{ width: `${course.progress || 0}%` }} />
+                    </div>
+                    <p className="text-xs mt-1 text-gray-600">{course.progress || 0}% Completed</p>
                   </div>
-                  <p className="text-xs sm:text-sm text-gray-600">
-                    {course.progress || 0}% Completed
-                  </p>
                 </div>
               </div>
             ))}
@@ -248,44 +244,41 @@ const StudentCourses = () => {
         )}
       </section>
 
-      {/* Recommended Courses */}
-      <section className="mt-10">
-        <h2 className="text-lg sm:text-xl font-semibold mb-4">
-          Recommended for You
-        </h2>
+      {/* RECOMMENDED COURSES */}
+      <section>
+        <h2 className="text-lg sm:text-xl font-semibold mb-4">Recommended for You</h2>
 
         {recommended.length === 0 ? (
-          <p className="text-gray-500 italic">
-            No other courses available right now.
-          </p>
+          <p className="text-gray-500 italic">No other courses available right now.</p>
         ) : (
-          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2">
             {recommended.map((course) => (
               <div
                 key={course._id}
-                className="flex items-center gap-4 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition w-full"
+                className="bg-white w-full rounded-2xl p-5 shadow-sm border border-gray-200 hover:shadow-lg transition"
               >
-                {course.image && (
-                  <img
-                    src={course.image}
-                    alt={course.title}
-                    className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 object-cover rounded-lg"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-800 text-sm sm:text-base mb-1 truncate">
-                    {course.title}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-gray-600 mb-2 line-clamp-2">
-                    {course.description?.slice(0, 80) ||
-                      "Learn more about this course."}
-                  </p>
-                  <button
-                    onClick={() => handleEnroll(course._id)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm px-3 sm:px-4 py-2 rounded-lg"
-                  >
-                    Enroll Now
-                  </button>
+                <div className="flex gap-4 items-center">
+                  {course.image && (
+                    <img
+                      src={course.image}
+                      alt={course.title}
+                      className="w-20 h-20 object-cover rounded-xl shadow"
+                    />
+                  )}
+
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 mb-1">{course.title}</h3>
+                    <p className="text-xs text-gray-600 mb-3 line-clamp-2">
+                      {course.description?.slice(0, 90) || "Learn more about this course."}
+                    </p>
+
+                    <button
+                      onClick={() => handleEnroll(course._id)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 py-2 rounded-lg"
+                    >
+                      Enroll Now
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
