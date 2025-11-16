@@ -1,13 +1,16 @@
 // controllers/studentController.js
-import User from "../models/User.js";
+import Enrollment from "../models/Enrollment.js";
 import Course from "../models/Course.js";
+import User from "../models/User.js";
 
 /* ============================================================
    📘 Get all available courses
    ============================================================ */
 export const getAvailableCourses = async (req, res) => {
   try {
-    const courses = await Course.find({ isPublished: true }).select("title description thumbnail instructor");
+    const courses = await Course.find({ isPublished: true }).select(
+      "title description thumbnail instructor"
+    );
     res.status(200).json({ success: true, courses });
   } catch (err) {
     console.error("Error fetching courses:", err);
@@ -16,42 +19,37 @@ export const getAvailableCourses = async (req, res) => {
 };
 
 /* ============================================================
-   🧩 Enroll in course (starts 21-day free trial)
+   🧩 Enroll in course (creates Enrollment document)
    ============================================================ */
 export const enrollInCourse = async (req, res) => {
   try {
-    const userId = req.user._id;
     const { courseId } = req.params;
 
-    const user = await User.findById(userId);
+    // Check if course exists
     const course = await Course.findById(courseId);
-
     if (!course) return res.status(404).json({ message: "Course not found" });
 
     // Check if already enrolled
-    const alreadyEnrolled = user.enrolledCourses.some(
-      (enrolled) => enrolled.course.toString() === courseId
-    );
-    if (alreadyEnrolled) {
-      return res.status(400).json({ message: "Already enrolled in this course" });
-    }
-
-    // Calculate trial expiry date (21 days)
-    const now = new Date();
-    const trialExpiresAt = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000);
-
-    user.enrolledCourses.push({
+    const existingEnrollment = await Enrollment.findOne({
+      student: req.user._id,
       course: courseId,
-      enrolledAt: now,
-      trialExpiresAt,
-      hasPaid: false,
     });
+    if (existingEnrollment) return res.status(400).json({ message: "Already enrolled" });
 
-    await user.save();
+    // Create enrollment
+    const enrollment = await Enrollment.create({
+      student: req.user._id,
+      course: courseId,
+      hasPaid: false,
+      started: false,
+      trialExpiresAt: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000), // 21-day trial
+      progress: 0,
+    });
 
     res.status(201).json({
       success: true,
       message: `Enrolled in ${course.title} with a 21-day free trial.`,
+      enrollment,
     });
   } catch (err) {
     console.error("Enrollment error:", err);
@@ -64,13 +62,11 @@ export const enrollInCourse = async (req, res) => {
    ============================================================ */
 export const getEnrolledCourses = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
-      .populate("enrolledCourses.course", "title thumbnail description")
+    const enrollments = await Enrollment.find({ student: req.user._id })
+      .populate("course", "title description thumbnail instructor")
       .lean();
 
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    res.status(200).json({ success: true, enrollments: user.enrolledCourses });
+    res.status(200).json({ success: true, enrollments });
   } catch (err) {
     console.error("Error fetching enrolled courses:", err);
     res.status(500).json({ message: "Error fetching enrolled courses" });
@@ -78,10 +74,43 @@ export const getEnrolledCourses = async (req, res) => {
 };
 
 /* ============================================================
+   📊 Get student dashboard stats (from Enrollment)
+   ============================================================ */
+export const getDashboard = async (req, res) => {
+  try {
+    const enrollments = await Enrollment.find({ student: req.user._id })
+      .populate("course", "title thumbnail instructor")
+      .lean();
+
+    const currentCourses = enrollments.map((enroll) => ({
+      id: enroll.course._id,
+      title: enroll.course.title,
+      instructor: enroll.course.instructor ?? "TBA",
+      image: enroll.course.thumbnail ?? "",
+      progress: enroll.progress ?? 0,
+    }));
+
+    // Get user for xp, badges, certificates
+    const user = await User.findById(req.user._id).lean();
+
+    const stats = {
+      coursesCount: enrollments.length,
+      xp: user?.xp ?? 0,
+      certificatesCount: user?.certificates?.length ?? 0,
+      badges: user?.badges ?? [],
+    };
+
+    res.status(200).json({ stats, currentCourses });
+  } catch (err) {
+    console.error("Dashboard error:", err);
+    res.status(500).json({ message: "Failed to load dashboard" });
+  }
+};
+
+/* ============================================================
    📈 Get course progress (placeholder)
    ============================================================ */
 export const getCourseProgress = async (req, res) => {
-  // In future, connect to lesson progress model
   res.status(200).json({ success: true, progress: 0 });
 };
 
