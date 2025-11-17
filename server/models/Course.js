@@ -47,10 +47,10 @@ const courseSchema = new mongoose.Schema(
     price: { type: Number, required: true },
     category: { type: String, required: true },
     instructor: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    image: { type: String }, // course thumbnail/image
+    thumbnail: { type: String }, // ✅ renamed from `image`
     content: [lessonSchema], // lessons
     quizzes: [quizSchema],   // quizzes
-    studentsEnrolled: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // ✅ Add this
+    studentsEnrolled: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   { timestamps: true }
 );

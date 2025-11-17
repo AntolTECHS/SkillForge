@@ -1,24 +1,40 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
+/* ============================================================
+   📌 Enrolled courses sub-schema
+   ============================================================ */
 const enrolledCourseSchema = new mongoose.Schema({
   course: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Course",
+    required: true,
   },
+
   enrolledAt: {
     type: Date,
     default: Date.now,
   },
-  trialExpiresAt: {
-    type: Date, // Automatically set to enrolledAt + 21 days
-  },
+
   hasPaid: {
     type: Boolean,
     default: false,
   },
+
+  progress: {
+    type: Number,
+    default: 0, // 0–100%
+  },
+
+  started: {
+    type: Boolean,
+    default: false, // Track if the course was opened
+  },
 });
 
+/* ============================================================
+   📌 User Schema
+   ============================================================ */
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -34,32 +50,17 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
     },
 
-    // permanent password hash
     password: {
       type: String,
       required: true,
       minlength: 6,
     },
 
-    // temporary one-time password (hashed)
-    tempPasswordHash: {
-      type: String,
-      default: null,
-    },
+    // 🔑 Temporary login password logic
+    tempPasswordHash: { type: String, default: null },
+    forcePasswordChange: { type: Boolean, default: false },
+    tempPasswordExpiry: { type: Date, default: null },
 
-    // if true, user must change password at next login
-    forcePasswordChange: {
-      type: Boolean,
-      default: false,
-    },
-
-    // optional expiry for the temp password
-    tempPasswordExpiry: {
-      type: Date,
-      default: null,
-    },
-
-    // Roles allowed: student, instructor, admin
     role: {
       type: String,
       enum: ["student", "instructor", "admin"],
@@ -81,32 +82,57 @@ const userSchema = new mongoose.Schema(
       default: true,
     },
 
-    // 🆕 Added this field for soft delete support
     isDeleted: {
       type: Boolean,
       default: false,
     },
 
-    // ✅ Track enrollments, free trial, and payments
+    // ⭐ XP system for rewards/badges
+    xp: {
+      type: Number,
+      default: 0,
+    },
+
+    // ⭐ Badges assigned by XP milestones
+    badges: [
+      {
+        type: String,
+      },
+    ],
+
+    // ⭐ Courses the student is enrolled in
     enrolledCourses: [enrolledCourseSchema],
   },
   { timestamps: true }
 );
 
-// 🔐 Hash password before saving (permanent password)
+/* ============================================================
+   🔐 PASSWORD / TEMP PASSWORD LOGIC
+   ============================================================ */
 userSchema.pre("save", async function (next) {
-  // hash permanent password if modified
+  // Hash permanent password
   if (this.isModified("password")) {
-    // Skip re-hashing if already hashed (bcrypt hashes start with "$2")
-    if (!(this.password && (this.password.startsWith("$2a$") || this.password.startsWith("$2b$") || this.password.startsWith("$2y$")))) {
+    if (
+      !(
+        this.password.startsWith("$2a$") ||
+        this.password.startsWith("$2b$") ||
+        this.password.startsWith("$2y$")
+      )
+    ) {
       const salt = await bcrypt.genSalt(10);
       this.password = await bcrypt.hash(this.password, salt);
     }
   }
 
-  // hash tempPasswordHash if it's a plain string and was modified
+  // Hash temp password
   if (this.isModified("tempPasswordHash") && this.tempPasswordHash) {
-    if (!(this.tempPasswordHash.startsWith("$2a$") || this.tempPasswordHash.startsWith("$2b$") || this.tempPasswordHash.startsWith("$2y$"))) {
+    if (
+      !(
+        this.tempPasswordHash.startsWith("$2a$") ||
+        this.tempPasswordHash.startsWith("$2b$") ||
+        this.tempPasswordHash.startsWith("$2y$")
+      )
+    ) {
       const salt = await bcrypt.genSalt(10);
       this.tempPasswordHash = await bcrypt.hash(this.tempPasswordHash, salt);
     }
@@ -115,57 +141,95 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// 🔑 Compare permanent passwords
+// Compare permanent password
 userSchema.methods.matchPassword = async function (enteredPassword) {
-  if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// 🔑 Compare temp (one-time) password
+// Compare temporary password
 userSchema.methods.matchTempPassword = async function (enteredPassword) {
   if (!this.tempPasswordHash) return false;
-  // check expiry if present
-  if (this.tempPasswordExpiry && new Date() > this.tempPasswordExpiry) return false;
+  if (this.tempPasswordExpiry && new Date() > this.tempPasswordExpiry)
+    return false;
   return await bcrypt.compare(enteredPassword, this.tempPasswordHash);
 };
 
-// ✅ Set a temporary one-time password (hashing will occur on save)
-// usage: await user.setTempPassword('plainTemp123', 7); await user.save();
+// Set a temporary one-time password
 userSchema.methods.setTempPassword = function (plainTempPassword, expiryDays = 7) {
   const now = new Date();
-  const expiry = expiryDays ? new Date(now.getTime() + expiryDays * 24 * 60 * 60 * 1000) : null;
+  const expiry = new Date(now.getTime() + expiryDays * 24 * 60 * 60 * 1000);
 
-  // store plain string for now — pre('save') will hash it
   this.tempPasswordHash = plainTempPassword;
   this.forcePasswordChange = true;
   this.tempPasswordExpiry = expiry;
-  this.createdByAdmin = true; // optional: mark that admin created this user
+  this.createdByAdmin = true;
 };
 
-// ✅ Clear temporary password (use after successful permanent password set)
+// Clear temp password
 userSchema.methods.clearTempPassword = function () {
   this.tempPasswordHash = null;
   this.forcePasswordChange = false;
   this.tempPasswordExpiry = null;
 };
 
-// ✅ Set permanent password and clear temp state
-// usage: await user.setPassword('newStrongPassword'); await user.save();
+// Set permanent password
 userSchema.methods.setPassword = function (newPlainPassword) {
-  this.password = newPlainPassword; // will be hashed by pre('save')
+  this.password = newPlainPassword;
   this.clearTempPassword();
 };
 
- // ✅ Automatically set trial expiry (21 days from enrollment)
-userSchema.methods.addCourseEnrollment = function (courseId, trialDays = 21) {
-  const now = new Date();
-  const trialExpiresAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+/* ============================================================
+   ⭐ Clean enrollment function (NO TRIAL)
+   ============================================================ */
+userSchema.methods.addCourseEnrollment = function (courseId) {
   this.enrolledCourses.push({
     course: courseId,
-    enrolledAt: now,
-    trialExpiresAt,
     hasPaid: false,
+    progress: 0,
+    started: false,
   });
+};
+
+/* ============================================================
+   ⭐ Update course progress & award XP
+   ============================================================ */
+userSchema.methods.updateCourseProgress = async function (courseId, newProgress) {
+  const enrollment = this.enrolledCourses.find(
+    (c) => c.course.toString() === courseId.toString()
+  );
+  if (!enrollment) throw new Error("Enrollment not found");
+
+  newProgress = Math.min(newProgress, 100);
+  let xpGained = 0;
+
+  // 1️⃣ First-time opening
+  if (!enrollment.started && newProgress > 0) {
+    enrollment.started = true;
+    xpGained += 2;
+  }
+
+  // 2️⃣ Every 10% progress
+  const oldTens = Math.floor(enrollment.progress / 10);
+  const newTens = Math.floor(newProgress / 10);
+  if (newTens > oldTens) xpGained += (newTens - oldTens);
+
+  // 3️⃣ Completion bonus
+  if (enrollment.progress < 100 && newProgress === 100) xpGained += 5;
+
+  enrollment.progress = newProgress;
+
+  // Update user XP & badges
+  this.xp += xpGained;
+
+  const badges = [];
+  if (this.xp >= 1000) badges.push("Level 1 Achiever");
+  if (this.xp >= 2000) badges.push("Level 2 Scholar");
+  if (this.xp >= 3000) badges.push("Level 3 Champion");
+
+  this.badges = [...new Set([...this.badges, ...badges])];
+
+  await this.save();
+  return { xpGained, newProgress, badges: this.badges };
 };
 
 const User = mongoose.model("User", userSchema);

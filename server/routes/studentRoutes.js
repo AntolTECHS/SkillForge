@@ -3,10 +3,11 @@ import {
   getAvailableCourses,
   enrollInCourse,
   getEnrolledCourses,
-  getCourseProgress,
   submitQuiz,
   generateCertificate,
-  getDashboard, // ✅ new dashboard endpoint
+  getDashboard,
+  updateProgress, // ✅ new progress update endpoint
+  openCourse,     // ✅ open course endpoint
 } from "../controllers/studentController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import { authorizeRoles } from "../middlewares/roleMiddleware.js";
@@ -26,14 +27,23 @@ router.get("/my-courses", getEnrolledCourses);
 router.post("/enroll/:courseId", enrollInCourse);
 
 /* ============================================================
-   📊 Dashboard endpoint (new)
+   📊 Dashboard endpoint
    ============================================================ */
 router.get("/dashboard", getDashboard);
 
 /* ============================================================
+   📌 Update course progress
+   ============================================================ */
+router.put("/progress/:courseId", updateProgress); // PUT instead of GET
+
+/* ============================================================
+   🟢 Open course (first-time XP)
+   ============================================================ */
+router.post("/open/:courseId", openCourse); // NEW endpoint
+
+/* ============================================================
    🧠 Learning progress & quizzes
    ============================================================ */
-router.get("/progress/:courseId", getCourseProgress);
 router.post("/quiz/:quizId/submit", submitQuiz);
 
 /* ============================================================

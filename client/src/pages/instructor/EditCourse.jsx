@@ -20,8 +20,8 @@ const EditCourse = () => {
     level: "",
     duration: "",
     content: [],
-    quizzes: [],
   });
+
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [lessonFiles, setLessonFiles] = useState({});
 
@@ -35,7 +35,12 @@ const EditCourse = () => {
         );
 
         if (res.data.success) {
-          setCourse(res.data.course);
+          const courseData = res.data.course;
+          const contentWithQuiz = (courseData.content || []).map((lesson) => ({
+            ...lesson,
+            quiz: lesson.quiz || [{ question: "", options: ["", "", "", ""], correctAnswer: 0 }],
+          }));
+          setCourse({ ...courseData, content: contentWithQuiz });
         } else {
           alert("Course not found or access denied");
           navigate("/instructor/my-courses");
@@ -77,7 +82,15 @@ const EditCourse = () => {
   const addLesson = () => {
     setCourse((prev) => ({
       ...prev,
-      content: [...prev.content, { title: "", type: "text", contentText: "" }],
+      content: [
+        ...prev.content,
+        {
+          title: "",
+          type: "text",
+          contentText: "",
+          quiz: [{ question: "", options: ["", "", "", ""], correctAnswer: 0 }],
+        },
+      ],
     }));
   };
 
@@ -93,71 +106,48 @@ const EditCourse = () => {
     });
   };
 
-  // Quiz handlers (same as before)
-  const addQuiz = () => {
-    setCourse((prev) => ({
-      ...prev,
-      quizzes: [
-        ...prev.quizzes,
-        { title: "", questions: [{ question: "", options: ["", ""], correctAnswer: "" }] },
-      ],
-    }));
-  };
-  const removeQuiz = (idx) => {
-    setCourse((prev) => ({ ...prev, quizzes: prev.quizzes.filter((_, i) => i !== idx) }));
-  };
-  const handleQuizChange = (quizIdx, field, value) => {
+  /** ------------------ Lesson Quiz Handlers ------------------ **/
+  const handleAddQuestion = (lessonIdx) => {
     setCourse((prev) => {
-      const newQuizzes = [...prev.quizzes];
-      newQuizzes[quizIdx][field] = value;
-      return { ...prev, quizzes: newQuizzes };
-    });
-  };
-  const handleQuestionChange = (quizIdx, qIdx, field, value) => {
-    setCourse((prev) => {
-      const newQuizzes = [...prev.quizzes];
-      newQuizzes[quizIdx].questions[qIdx][field] = value;
-      return { ...prev, quizzes: newQuizzes };
-    });
-  };
-  const addQuestion = (quizIdx) => {
-    setCourse((prev) => {
-      const newQuizzes = [...prev.quizzes];
-      newQuizzes[quizIdx].questions.push({ question: "", options: ["", ""], correctAnswer: "" });
-      return { ...prev, quizzes: newQuizzes };
-    });
-  };
-  const removeQuestion = (quizIdx, qIdx) => {
-    setCourse((prev) => {
-      const newQuizzes = [...prev.quizzes];
-      newQuizzes[quizIdx].questions = newQuizzes[quizIdx].questions.filter((_, i) => i !== qIdx);
-      return { ...prev, quizzes: newQuizzes };
-    });
-  };
-  const handleOptionChange = (quizIdx, qIdx, optIdx, value) => {
-    setCourse((prev) => {
-      const newQuizzes = [...prev.quizzes];
-      newQuizzes[quizIdx].questions[qIdx].options[optIdx] = value;
-      return { ...prev, quizzes: newQuizzes };
-    });
-  };
-  const addOption = (quizIdx, qIdx) => {
-    setCourse((prev) => {
-      const newQuizzes = [...prev.quizzes];
-      newQuizzes[quizIdx].questions[qIdx].options.push("");
-      return { ...prev, quizzes: newQuizzes };
-    });
-  };
-  const removeOption = (quizIdx, qIdx, optIdx) => {
-    setCourse((prev) => {
-      const newQuizzes = [...prev.quizzes];
-      newQuizzes[quizIdx].questions[qIdx].options =
-        newQuizzes[quizIdx].questions[qIdx].options.filter((_, i) => i !== optIdx);
-      return { ...prev, quizzes: newQuizzes };
+      const newContent = [...prev.content];
+      newContent[lessonIdx].quiz.push({ question: "", options: ["", "", "", ""], correctAnswer: 0 });
+      return { ...prev, content: newContent };
     });
   };
 
-  // ------------------ Submit handler ------------------
+  const handleRemoveQuestion = (lessonIdx, qIdx) => {
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIdx].quiz = newContent[lessonIdx].quiz.filter((_, i) => i !== qIdx);
+      return { ...prev, content: newContent };
+    });
+  };
+
+  const handleQuestionChange = (lessonIdx, qIdx, field, value) => {
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIdx].quiz[qIdx][field] = value;
+      return { ...prev, content: newContent };
+    });
+  };
+
+  const handleOptionChange = (lessonIdx, qIdx, optIdx, value) => {
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIdx].quiz[qIdx].options[optIdx] = value;
+      return { ...prev, content: newContent };
+    });
+  };
+
+  const handleCorrectAnswerChange = (lessonIdx, qIdx, value) => {
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIdx].quiz[qIdx].correctAnswer = parseInt(value, 10);
+      return { ...prev, content: newContent };
+    });
+  };
+
+  /** ------------------ Submit ------------------ **/
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -172,13 +162,19 @@ const EditCourse = () => {
       // Thumbnail
       if (thumbnailFile) formData.append("thumbnail", thumbnailFile);
 
-      // Content & quizzes as JSON
-      formData.append("content", JSON.stringify(course.content));
-      formData.append("quizzes", JSON.stringify(course.quizzes));
+      // Only include filled quiz questions
+      const contentToSend = course.content.map((lesson) => {
+        const filteredQuiz = (lesson.quiz || []).filter(
+          (q) => q.question.trim() !== "" || q.options.some((opt) => opt.trim() !== "")
+        );
+        return { ...lesson, quiz: filteredQuiz };
+      });
+
+      formData.append("content", JSON.stringify(contentToSend));
 
       // Lesson files
       Object.keys(lessonFiles).forEach((idx) => {
-        formData.append("lessonFiles", lessonFiles[idx]); // Backend expects "lessonFiles" array
+        formData.append("lessonFiles", lessonFiles[idx]);
       });
 
       const res = await axios.put(
@@ -205,6 +201,7 @@ const EditCourse = () => {
     <div className="p-6 max-w-5xl mx-auto" style={pageFont}>
       <h1 className="text-3xl font-bold mb-6">Edit Course</h1>
       <form onSubmit={handleSubmit} className="space-y-6">
+
         {/* COURSE DETAILS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input type="text" name="title" value={course.title} onChange={handleChange} placeholder="Course Title" className="border rounded px-3 py-2" required />
@@ -218,6 +215,7 @@ const EditCourse = () => {
           <textarea name="description" value={course.description} onChange={handleChange} placeholder="Course Description" className="border w-full rounded px-3 py-2" rows={4} required />
         </div>
 
+        {/* Thumbnail */}
         <div>
           <label className="font-medium">Thumbnail</label>
           <input type="file" onChange={handleThumbnailChange} className="w-full mb-2" />
@@ -235,15 +233,31 @@ const EditCourse = () => {
                 <option value="video">Video</option>
                 <option value="file">File</option>
               </select>
-              {lesson.type !== "text" && <input type="file" onChange={(e) => handleLessonFileChange(e, idx)} />}
+              {lesson.type !== "text" && <input type="file" onChange={(e) => handleLessonFileChange(e, idx)} className="mb-2" />}
+
+              {/* Lesson Quiz */}
+              <div className="mt-2">
+                <h3 className="font-semibold mb-2">Lesson Quiz</h3>
+                {lesson.quiz.map((q, qIdx) => (
+                  <div key={qIdx} className="border p-2 mb-2 rounded">
+                    <input type="text" placeholder="Question" value={q.question} onChange={(e) => handleQuestionChange(idx, qIdx, "question", e.target.value)} className="w-full border rounded px-2 py-1 mb-1" />
+                    {q.options.map((opt, optIdx) => (
+                      <input key={optIdx} type="text" placeholder={`Option ${optIdx+1}`} value={opt} onChange={(e) => handleOptionChange(idx, qIdx, optIdx, e.target.value)} className="w-full border rounded px-2 py-1 mb-1" />
+                    ))}
+                    <select value={q.correctAnswer} onChange={(e) => handleCorrectAnswerChange(idx, qIdx, e.target.value)} className="w-full border rounded px-2 py-1 mb-1">
+                      {q.options.map((_, optIdx) => <option key={optIdx} value={optIdx}>Correct Answer: Option {optIdx+1}</option>)}
+                    </select>
+                    {lesson.quiz.length > 1 && <button type="button" onClick={() => handleRemoveQuestion(idx, qIdx)} className="text-red-600 mt-1">Remove Question</button>}
+                  </div>
+                ))}
+                <button type="button" onClick={() => handleAddQuestion(idx)} className="bg-blue-500 text-white px-3 py-1 rounded mb-1">+ Add Question</button>
+              </div>
+
               <button type="button" onClick={() => removeLesson(idx)} className="text-red-600 mt-2">Remove Lesson</button>
             </div>
           ))}
           <button type="button" onClick={addLesson} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">+ Add Lesson</button>
         </div>
-
-        {/* QUIZZES (keep same as before) */}
-        {/* ... quizzes JSX remains unchanged ... */}
 
         <button type="submit" className="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 mt-6">Update Course</button>
       </form>

@@ -1,4 +1,25 @@
+import { useEffect, useState } from "react";
+import axios from "axios";
+
 const StudentRewards = () => {
+  const [xp, setXp] = useState(0);
+  const [badges, setBadges] = useState([]);
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const res = await axios.get("/api/student/dashboard");
+        const stats = res.data?.stats || {};
+        setXp(stats.xp || 0);
+        setBadges(stats.badges || []);
+      } catch (err) {
+        console.error("Failed to fetch dashboard data:", err);
+      }
+    };
+
+    fetchDashboard();
+  }, []);
+
   const rewards = [
     { id: 1, title: "Level 1 Achiever", xp: 1000, badgeColor: "bg-yellow-400" },
     { id: 2, title: "Level 2 Scholar", xp: 2000, badgeColor: "bg-green-400" },
@@ -9,24 +30,47 @@ const StudentRewards = () => {
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-4">🏅 XP & Rewards</h1>
       <p className="text-gray-600 mb-6">
-        Earn XP by completing courses and unlock new badges!
+        XP is automatically awarded based on your course progress.
       </p>
 
+      <h2 className="text-lg font-semibold mb-3">
+        Your XP: <span className="text-blue-600">{xp}</span>
+      </h2>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {rewards.map((reward) => (
-          <div
-            key={reward.id}
-            className="bg-white p-6 rounded-2xl shadow border border-gray-200 text-center"
-          >
+        {rewards.map((reward) => {
+          const unlocked = xp >= reward.xp;
+
+          return (
             <div
-              className={`mx-auto w-16 h-16 rounded-full ${reward.badgeColor} flex items-center justify-center text-2xl font-bold text-white mb-3`}
+              key={reward.id}
+              className={`p-6 rounded-2xl text-center border shadow transition ${
+                unlocked
+                  ? "bg-white border-green-400 shadow-lg"
+                  : "bg-gray-100 border-gray-300 opacity-60"
+              }`}
             >
-              {reward.id}
+              <div
+                className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white mb-3 ${
+                  unlocked ? reward.badgeColor : "bg-gray-400"
+                }`}
+              >
+                {reward.id}
+              </div>
+
+              <h2 className="text-xl font-semibold">{reward.title}</h2>
+              <p className="text-gray-600">Requires: {reward.xp} XP</p>
+
+              <p className="mt-2 text-sm font-medium">
+                {unlocked ? (
+                  <span className="text-green-600">Unlocked ✔</span>
+                ) : (
+                  <span className="text-red-500">{reward.xp - xp} XP needed</span>
+                )}
+              </p>
             </div>
-            <h2 className="text-xl font-semibold">{reward.title}</h2>
-            <p className="text-gray-600">XP Required: {reward.xp}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

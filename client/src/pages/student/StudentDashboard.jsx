@@ -1,4 +1,3 @@
-// src/pages/student/StudentDashboard.jsx
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
@@ -36,12 +35,10 @@ const StudentDashboard = () => {
   // --------------------------
   // First Name
   // --------------------------
-  const firstName = useMemo(() => {
-    return user?.name?.split?.(" ")?.[0] || "Learner";
-  }, [user]);
+  const firstName = useMemo(() => user?.name?.split?.(" ")?.[0] || "Learner", [user]);
 
   // --------------------------
-  // Dashboard Data (Dynamic)
+  // Dashboard Data
   // --------------------------
   const [stats, setStats] = useState({
     coursesCount: 0,
@@ -55,8 +52,9 @@ const StudentDashboard = () => {
     const loadDashboard = async () => {
       try {
         const res = await axios.get("/api/student/dashboard");
-        setStats(res.data.stats ?? {});
-        setCurrentCourses(res.data.currentCourses ?? []);
+        const data = res.data ?? {};
+        setStats(data.stats ?? {});
+        setCurrentCourses(data.currentCourses ?? []);
       } catch (err) {
         console.error("Dashboard load error:", err);
       }
@@ -69,6 +67,8 @@ const StudentDashboard = () => {
     fontFamily:
       "'Poppins', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
   };
+
+  const placeholderImage = "/images/course-placeholder.png";
 
   return (
     <div className="min-h-screen w-full" style={rootFontStyle}>
@@ -142,67 +142,81 @@ const StudentDashboard = () => {
               </div>
             </div>
 
-            {/* MOBILE LIST */}
-            <div className="flex flex-col gap-3 md:hidden">
-              {currentCourses.map((course) => (
-                <div
-                  key={course.id}
-                  className="bg-white rounded-2xl shadow border border-blue-100 overflow-hidden transition p-3 flex items-center gap-3"
-                >
-                  <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border border-gray-100">
-                    <img src={course.image} alt={course.title} className="w-full h-full object-cover" />
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">{course.title}</h3>
-                      <div className="text-sm font-semibold text-sky-600">{course.progress}%</div>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">Instructor: {course.instructor}</p>
-                    <div className="mt-3">
-                      <div className="w-full bg-blue-100 rounded-full h-2">
-                        <div
-                          className="bg-sky-500 h-2 rounded-full transition-all"
-                          style={{ width: `${course.progress}%` }}
+            {currentCourses.length === 0 ? (
+              <p className="text-gray-500 italic">You are not enrolled in any courses yet.</p>
+            ) : (
+              <>
+                {/* MOBILE LIST */}
+                <div className="flex flex-col gap-3 md:hidden">
+                  {currentCourses.map((course) => (
+                    <div
+                      key={course.id}
+                      className="bg-white rounded-2xl shadow border border-blue-100 overflow-hidden transition p-3 flex items-center gap-3"
+                    >
+                      <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border border-gray-100">
+                        <img
+                          src={course.image || placeholderImage}
+                          alt={course.title || "Course Image"}
+                          className="w-full h-full object-cover"
                         />
                       </div>
+
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between">
+                          <h3 className="text-sm font-semibold text-gray-800">{course.title || "Untitled Course"}</h3>
+                          <div className="text-sm font-semibold text-sky-600">{course.progress ?? 0}%</div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Instructor: {course.instructor ?? "TBA"}</p>
+                        <div className="mt-3">
+                          <div className="w-full bg-blue-100 rounded-full h-2">
+                            <div
+                              className="bg-sky-500 h-2 rounded-full transition-all"
+                              style={{ width: `${course.progress ?? 0}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            {/* DESKTOP HORIZONTAL SCROLLER */}
-            <div className="hidden md:flex gap-4 overflow-x-auto py-2 pb-4 snap-x snap-mandatory">
-              {currentCourses.map((course) => (
-                <div
-                  key={course.id}
-                  className="bg-white rounded-2xl shadow border border-blue-100 overflow-hidden hover:shadow-lg transition flex-shrink-0 snap-center"
-                  style={{ minWidth: "20.5rem" }}
-                >
-                  <div className="h-28 sm:h-32 w-full overflow-hidden rounded-t-2xl">
-                    <img src={course.image} alt={course.title} className="w-full h-full object-cover" />
-                  </div>
-
-                  <div className="p-3 sm:p-4 flex-1 flex flex-col" style={{ minHeight: "8.5rem" }}>
-                    <div className="flex-1">
-                      <h3 className="text-sm sm:text-base font-semibold mb-1 text-gray-800">{course.title}</h3>
-                      <p className="text-xs text-gray-500 mb-2">Instructor: {course.instructor}</p>
-                    </div>
-
-                    <div className="mt-1">
-                      <div className="w-full bg-blue-100 rounded-full h-2 mb-2">
-                        <div
-                          className="bg-sky-500 h-2 rounded-full transition-all"
-                          style={{ width: `${course.progress}%` }}
+                {/* DESKTOP HORIZONTAL SCROLLER */}
+                <div className="hidden md:flex gap-4 overflow-x-auto py-2 pb-4 snap-x snap-mandatory">
+                  {currentCourses.map((course) => (
+                    <div
+                      key={course.id}
+                      className="bg-white rounded-2xl shadow border border-blue-100 overflow-hidden hover:shadow-lg transition flex-shrink-0 snap-center"
+                      style={{ minWidth: "20.5rem" }}
+                    >
+                      <div className="h-28 sm:h-32 w-full overflow-hidden rounded-t-2xl">
+                        <img
+                          src={course.image || placeholderImage}
+                          alt={course.title || "Course Image"}
+                          className="w-full h-full object-cover"
                         />
                       </div>
-                      <p className="text-xs text-gray-500">{course.progress}% completed</p>
+
+                      <div className="p-3 sm:p-4 flex-1 flex flex-col" style={{ minHeight: "8.5rem" }}>
+                        <div className="flex-1">
+                          <h3 className="text-sm sm:text-base font-semibold mb-1 text-gray-800">{course.title || "Untitled Course"}</h3>
+                          <p className="text-xs text-gray-500 mb-2">Instructor: {course.instructor ?? "TBA"}</p>
+                        </div>
+
+                        <div className="mt-1">
+                          <div className="w-full bg-blue-100 rounded-full h-2 mb-2">
+                            <div
+                              className="bg-sky-500 h-2 rounded-full transition-all"
+                              style={{ width: `${course.progress ?? 0}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-500">{course.progress ?? 0}% completed</p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            )}
           </div>
         </div>
       </div>
