@@ -8,7 +8,7 @@ const CreateCourse = () => {
     description: "",
     price: "",
     category: "",
-    image: null,
+    thumbnail: null,
     content: [
       {
         title: "",
@@ -29,96 +29,98 @@ const CreateCourse = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const pageFont = {
-    fontFamily:
-      "'Poppins', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
-  };
-
   /** ------------------ Lesson Handlers ------------------ **/
   const handleAddLesson = () => {
-    setCourse({
-      ...course,
+    setCourse((prev) => ({
+      ...prev,
       content: [
-        ...course.content,
+        ...prev.content,
         {
           title: "",
           type: "text",
           file: null,
           contentText: "",
-          quiz: [
-            {
-              question: "",
-              options: ["", "", "", ""],
-              correctAnswer: 0,
-            },
-          ],
+          quiz: [{ question: "", options: ["", "", "", ""], correctAnswer: 0 }],
         },
       ],
-    });
+    }));
   };
 
   const handleRemoveLesson = (index) => {
-    const newContent = [...course.content];
-    newContent.splice(index, 1);
-    setCourse({ ...course, content: newContent });
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent.splice(index, 1);
+      return { ...prev, content: newContent };
+    });
   };
 
   const handleLessonChange = (index, field, value) => {
-    const newContent = [...course.content];
-    newContent[index][field] = value;
-    setCourse({ ...course, content: newContent });
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[index][field] = value;
+      return { ...prev, content: newContent };
+    });
   };
 
   const handleFileChange = (index, file) => {
-    const newContent = [...course.content];
-    newContent[index].file = file;
-    setCourse({ ...course, content: newContent });
+    handleLessonChange(index, "file", file);
   };
 
-  /** ------------------ Lesson Quiz Handlers ------------------ **/
+  /** ------------------ Quiz Handlers ------------------ **/
   const handleAddQuestion = (lessonIndex) => {
-    const newContent = [...course.content];
-    newContent[lessonIndex].quiz.push({
-      question: "",
-      options: ["", "", "", ""],
-      correctAnswer: 0,
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIndex].quiz.push({
+        question: "",
+        options: ["", "", "", ""],
+        correctAnswer: 0,
+      });
+      return { ...prev, content: newContent };
     });
-    setCourse({ ...course, content: newContent });
   };
 
   const handleRemoveQuestion = (lessonIndex, questionIndex) => {
-    const newContent = [...course.content];
-    newContent[lessonIndex].quiz.splice(questionIndex, 1);
-    setCourse({ ...course, content: newContent });
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIndex].quiz.splice(questionIndex, 1);
+      return { ...prev, content: newContent };
+    });
   };
 
   const handleQuestionChange = (lessonIndex, questionIndex, field, value) => {
-    const newContent = [...course.content];
-    newContent[lessonIndex].quiz[questionIndex][field] = value;
-    setCourse({ ...course, content: newContent });
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIndex].quiz[questionIndex][field] = value;
+      return { ...prev, content: newContent };
+    });
   };
 
   const handleOptionChange = (lessonIndex, questionIndex, optionIndex, value) => {
-    const newContent = [...course.content];
-    newContent[lessonIndex].quiz[questionIndex].options[optionIndex] = value;
-    setCourse({ ...course, content: newContent });
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIndex].quiz[questionIndex].options[optionIndex] = value;
+      return { ...prev, content: newContent };
+    });
   };
 
   const handleCorrectAnswerChange = (lessonIndex, questionIndex, value) => {
-    const newContent = [...course.content];
-    newContent[lessonIndex].quiz[questionIndex].correctAnswer = parseInt(value, 10);
-    setCourse({ ...course, content: newContent });
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIndex].quiz[questionIndex].correctAnswer = parseInt(value, 10);
+      return { ...prev, content: newContent };
+    });
   };
 
-  /** ------------------ Image Handler ------------------ **/
-  const handleImageChange = (file) => {
-    setCourse({ ...course, image: file });
+  /** ------------------ Thumbnail Handler ------------------ **/
+  const handleThumbnailChange = (file) => {
+    setCourse((prev) => ({ ...prev, thumbnail: file }));
   };
 
   /** ------------------ Submit ------------------ **/
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
     try {
       const token = localStorage.getItem("token");
       const formData = new FormData();
@@ -128,17 +130,18 @@ const CreateCourse = () => {
       formData.append("price", course.price);
       formData.append("category", course.category);
 
-      if (course.image) formData.append("image", course.image);
+      if (course.thumbnail) formData.append("thumbnail", course.thumbnail);
 
       formData.append("content", JSON.stringify(course.content));
 
+      // Add lesson files
       course.content.forEach((lesson) => {
         if ((lesson.type === "video" || lesson.type === "pdf") && lesson.file) {
-          formData.append("files", lesson.file);
+          formData.append("lessonFiles", lesson.file);
         }
       });
 
-      await axios.post("http://localhost:5000/api/courses", formData, {
+      await axios.post(`${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/courses`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data",
@@ -155,7 +158,7 @@ const CreateCourse = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-6" style={pageFont}>
+    <div className="max-w-5xl mx-auto p-6 font-sans">
       <h1 className="text-3xl font-bold mb-6">Create New Course</h1>
 
       <form className="bg-white shadow rounded-xl p-6 space-y-6" onSubmit={handleSubmit}>
@@ -197,21 +200,27 @@ const CreateCourse = () => {
           />
         </div>
 
-        {/* Course Image */}
+        {/* Thumbnail */}
         <div>
-          <label className="block mb-2 font-medium">Course Image</label>
+          <label className="block mb-2 font-medium">Course Thumbnail</label>
           <input
             type="file"
             accept="image/*"
-            onChange={(e) => handleImageChange(e.target.files[0])}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            onChange={(e) => handleThumbnailChange(e.target.files[0])}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-2"
           />
+          {course.thumbnail && (
+            <img
+              src={URL.createObjectURL(course.thumbnail)}
+              alt="Thumbnail Preview"
+              className="mt-2 w-48 h-32 object-cover rounded-lg border"
+            />
+          )}
         </div>
 
-        {/* Lessons with Quiz */}
+        {/* Lessons */}
         <div>
           <h2 className="text-xl font-semibold mb-3">Course Lessons</h2>
-
           {course.content.map((lesson, index) => (
             <div key={index} className="border border-gray-200 rounded-xl p-4 mb-4 relative">
               <input
@@ -245,12 +254,15 @@ const CreateCourse = () => {
               )}
 
               {(lesson.type === "video" || lesson.type === "pdf") && (
-                <input
-                  type="file"
-                  onChange={(e) => handleFileChange(index, e.target.files[0])}
-                  className="w-full mb-2"
-                  required
-                />
+                <>
+                  <input
+                    type="file"
+                    onChange={(e) => handleFileChange(index, e.target.files[0])}
+                    className="w-full mb-2"
+                    required
+                  />
+                  {lesson.file && <p className="text-sm text-gray-600">Selected file: {lesson.file.name}</p>}
+                </>
               )}
 
               {/* Quiz per lesson */}

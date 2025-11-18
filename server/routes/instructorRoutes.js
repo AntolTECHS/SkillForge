@@ -4,17 +4,17 @@ import multer from "multer";
 import {
   createCourse,
   updateCourse,
-  publishCourse,
+  togglePublishCourse, // updated
+  deleteCourse,
   getMyCourses,
   getCourseById,
   addQuiz,
-  deleteCourse,
   getStudentsForInstructor,
   getProfile,
   updateProfile,
 } from "../controllers/instructorController.js";
 
-import { protect, allowWeakAuth } from "../middlewares/authMiddleware.js";
+import { protect } from "../middlewares/authMiddleware.js";
 import { authorizeRoles } from "../middlewares/roleMiddleware.js";
 
 const router = express.Router();
@@ -31,19 +31,17 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // -------------------- PROFILE ROUTES --------------------
-// Only full instructor access
 router.get("/profile", protect, authorizeRoles("instructor"), getProfile);
 router.put("/profile", protect, authorizeRoles("instructor"), updateProfile);
 
 // -------------------- COURSE ROUTES --------------------
-// Instructor only
 router.post(
   "/courses",
   protect,
   authorizeRoles("instructor"),
   upload.fields([
     { name: "thumbnail", maxCount: 1 },
-    { name: "lessonFiles" }
+    { name: "lessonFiles" },
   ]),
   createCourse
 );
@@ -54,7 +52,7 @@ router.put(
   authorizeRoles("instructor"),
   upload.fields([
     { name: "thumbnail", maxCount: 1 },
-    { name: "lessonFiles" }
+    { name: "lessonFiles" },
   ]),
   updateCourse
 );
@@ -70,7 +68,7 @@ router.patch(
   "/courses/:courseId/status",
   protect,
   authorizeRoles("instructor"),
-  publishCourse
+  togglePublishCourse // ✅ matches the controller
 );
 
 router.post(
@@ -81,7 +79,6 @@ router.post(
 );
 
 // -------------------- INSTRUCTOR'S COURSES & STUDENTS --------------------
-// Only instructors (full auth)
 router.get("/my-courses", protect, authorizeRoles("instructor"), getMyCourses);
 router.get("/students", protect, authorizeRoles("instructor"), getStudentsForInstructor);
 router.get("/courses/:courseId", protect, authorizeRoles("instructor"), getCourseById);

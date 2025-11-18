@@ -7,14 +7,13 @@ const StudentCourses = () => {
   const [loading, setLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedLesson, setSelectedLesson] = useState(null);
-  const [enrollingCourseId, setEnrollingCourseId] = useState(null);
 
   const rootFontStyle = {
     fontFamily:
       "'Poppins', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
   };
 
-  // Load Google Fonts
+  // Load Poppins font dynamically
   useEffect(() => {
     if (!document.getElementById("gf-poppins")) {
       const link = document.createElement("link");
@@ -26,19 +25,17 @@ const StudentCourses = () => {
     }
   }, []);
 
-  // Fetch courses & enrolled courses
+  // Fetch all published courses and enrollments
   const fetchCoursesAndEnrollments = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
 
       const [coursesRes, enrollRes] = await Promise.all([
-        axios.get("http://localhost:5000/api/courses/available"),
-        token
-          ? axios.get("http://localhost:5000/api/student/my-courses", {
-              headers: { Authorization: `Bearer ${token}` },
-            })
-          : Promise.resolve({ data: { enrollments: [] } }),
+        axios.get("http://localhost:5000/api/courses/available"), // published courses
+        axios.get("http://localhost:5000/api/enrollments", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
 
       const allCourses = Array.isArray(coursesRes.data.courses)
@@ -49,7 +46,6 @@ const StudentCourses = () => {
         ...e.course,
         progress: e.progress || 0,
         hasPaid: e.hasPaid,
-        started: e.started,
       }));
 
       setCourses(allCourses);
@@ -67,43 +63,23 @@ const StudentCourses = () => {
 
   // Enroll in a course
   const handleEnroll = async (courseId) => {
-    const token = localStorage.getItem("token");
-    if (!token) return alert("You must be logged in to enroll in a course.");
-
-    setEnrollingCourseId(courseId);
     try {
-      const res = await axios.post(
-        `http://localhost:5000/api/student/enroll/${courseId}`,
-        null,
+      const token = localStorage.getItem("token");
+      await axios.post(
+        "http://localhost:5000/api/enrollments",
+        { courseId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      alert(res.data.message || "Enrolled successfully!");
-      await fetchCoursesAndEnrollments();
+      await fetchCoursesAndEnrollments(); // refresh after enrollment
     } catch (err) {
+      console.error("Failed to enroll", err);
       alert(err.response?.data?.message || "Enrollment failed");
-      console.error(err);
-    } finally {
-      setEnrollingCourseId(null);
     }
   };
 
-  // Start a course
-  const handleStartCourse = async (course) => {
+  const handleStartCourse = (course) => {
     setSelectedCourse(course);
     setSelectedLesson(null);
-
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return;
-
-      await axios.post(
-        `http://localhost:5000/api/student/open/${course._id}`,
-        null,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-    } catch (err) {
-      console.error("Failed to open course:", err);
-    }
   };
 
   const handleBackToCourses = () => {
@@ -115,48 +91,7 @@ const StudentCourses = () => {
     setSelectedLesson(null);
   };
 
-  // Update course progress
-  const updateCourseProgress = async (courseId, newProgress) => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return;
-
-      const res = await axios.put(
-        `http://localhost:5000/api/student/progress/${courseId}`,
-        { progress: newProgress },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setEnrolled((prev) =>
-        prev.map((c) =>
-          c._id === courseId ? { ...c, progress: res.data.progress } : c
-        )
-      );
-
-      if (res.data.xpGained) console.log(`You gained ${res.data.xpGained} XP!`);
-    } catch (err) {
-      console.error("Failed to update progress:", err);
-    }
-  };
-
-  // Handle lesson viewed
-  useEffect(() => {
-    if (!selectedCourse || !selectedLesson) return;
-
-    const totalLessons = selectedCourse.content?.length || 1;
-    const lessonIndex = selectedCourse.content.findIndex(
-      (l) => l._id === selectedLesson._id
-    );
-
-    const newProgress = Math.min(
-      100,
-      Math.round(((lessonIndex + 1) / totalLessons) * 100)
-    );
-
-    updateCourseProgress(selectedCourse._id, newProgress);
-  }, [selectedLesson]);
-
-  // === LESSON VIEW ===
+  // === LESSON PAGE ===
   if (selectedCourse && selectedLesson) {
     return (
       <div className="p-6" style={rootFontStyle}>
@@ -168,6 +103,25 @@ const StudentCourses = () => {
         </button>
 
         <h1 className="text-2xl font-bold mb-4">{selectedLesson.title}</h1>
+
+        {selectedLesson.type === "video" && selectedLesson.url && (
+          <video
+            src={selectedLesson.url}
+            controls
+            className="w-full rounded-xl shadow-md"
+          />
+        )}
+
+        {selectedLesson.type === "file" && selectedLesson.url && (
+          <a
+            href={selectedLesson.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:underline"
+          >
+            View File
+          </a>
+        )}
 
         {selectedLesson.type === "text" && selectedLesson.contentText && (
           <p className="whitespace-pre-wrap text-gray-800 leading-relaxed bg-gray-50 p-4 rounded-lg border">
@@ -189,24 +143,57 @@ const StudentCourses = () => {
           ← Back to Courses
         </button>
 
+        <div className="relative overflow-hidden rounded-2xl p-6 shadow-lg mb-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-100">
+          {selectedCourse.image && (
+            <img
+              src={selectedCourse.image}
+              alt={selectedCourse.title}
+              className="w-full md:w-72 h-44 object-cover rounded-xl shadow-md mb-5"
+            />
+          )}
+
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">
+            {selectedCourse.title}
+          </h1>
+          <p className="text-gray-700 leading-relaxed">{selectedCourse.description}</p>
+
+          <div className="absolute inset-0 opacity-10 pointer-events-none bg-gradient-to-br from-blue-400 via-purple-300 to-pink-300" />
+        </div>
+
         <h2 className="text-xl font-semibold mb-4">Course Lessons</h2>
         {selectedCourse.content?.length ? (
           <div className="space-y-3">
-            {selectedCourse.content.map((lesson) => (
+            {selectedCourse.content.map((lesson, idx) => (
               <div
-                key={lesson._id || lesson.title}
+                key={idx}
                 onClick={() => setSelectedLesson(lesson)}
                 className="p-4 bg-gray-50 rounded-xl border cursor-pointer hover:bg-gray-100 transition"
               >
-                <h3 className="font-semibold text-gray-800 line-clamp-1">
-                  {lesson.title}
-                </h3>
+                <h3 className="font-semibold text-gray-800">{lesson.title || `Lesson ${idx + 1}`}</h3>
                 <p className="text-sm text-gray-500">{lesson.type}</p>
               </div>
             ))}
           </div>
         ) : (
           <p className="text-gray-500 italic">No lessons available yet.</p>
+        )}
+
+        <h2 className="text-xl font-semibold mt-6 mb-4">Quizzes</h2>
+        {selectedCourse.quizzes?.length ? (
+          <div className="space-y-3">
+            {selectedCourse.quizzes.map((quiz, qIdx) => (
+              <div key={qIdx} className="p-4 bg-gray-50 rounded-xl border">
+                <h3 className="font-semibold text-gray-800">{quiz.title}</h3>
+                <ul className="list-disc ml-6 mt-2">
+                  {quiz.questions.map((question, idx) => (
+                    <li key={idx} className="text-gray-700">{question.question}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500 italic">No quizzes available yet.</p>
         )}
       </div>
     );
@@ -216,14 +203,6 @@ const StudentCourses = () => {
   const enrolledIds = new Set(enrolled.map((c) => c._id));
   const recommended = courses.filter((c) => !enrolledIds.has(c._id));
 
-  if (loading) return <p className="p-6">Loading courses...</p>;
-
-  const getImageUrl = (img) => {
-    // If image starts with http/https, return as-is, else prepend backend URL
-    if (!img) return "/images/default-course.png";
-    return img.startsWith("http") ? img : `http://localhost:5000/${img}`;
-  };
-
   return (
     <div className="p-4 sm:p-6" style={rootFontStyle}>
       <h1 className="text-2xl sm:text-3xl font-bold mb-6">Explore Courses</h1>
@@ -231,34 +210,33 @@ const StudentCourses = () => {
       {/* ENROLLED COURSES */}
       <section className="mb-12">
         <h2 className="text-lg sm:text-xl font-semibold mb-4">Enrolled Modules</h2>
+
         {enrolled.length === 0 ? (
           <p className="text-gray-500 italic">You haven’t enrolled in any courses yet.</p>
         ) : (
           <div className="grid gap-6 md:grid-cols-2">
             {enrolled.map((course) => (
               <div
-                key={course._id || course.title}
+                key={course._id}
                 onClick={() => handleStartCourse(course)}
-                className="bg-white w-full rounded-2xl p-5 shadow-sm border border-gray-200 hover:shadow-lg transition cursor-pointer flex gap-4 items-center"
+                className="bg-white w-full rounded-2xl p-5 shadow-sm border border-gray-200 hover:shadow-lg transition cursor-pointer"
               >
-                <img
-                  src={getImageUrl(course.image)}
-                  alt={course.title}
-                  className="w-24 h-24 object-cover rounded-xl shadow flex-shrink-0"
-                />
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 mb-2 line-clamp-1">
-                    {course.title}
-                  </h3>
-                  <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
-                    <div
-                      className="bg-teal-600 h-2 transition-all duration-300"
-                      style={{ width: `${course.progress || 0}%` }}
+                <div className="flex gap-4 items-center">
+                  {course.image && (
+                    <img
+                      src={course.image}
+                      alt={course.title}
+                      className="w-20 h-20 object-cover rounded-xl shadow"
                     />
+                  )}
+
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 mb-2">{course.title}</h3>
+                    <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                      <div className="bg-teal-600 h-2" style={{ width: `${course.progress || 0}%` }} />
+                    </div>
+                    <p className="text-xs mt-1 text-gray-600">{course.progress || 0}% Completed</p>
                   </div>
-                  <p className="text-xs mt-1 text-gray-600">
-                    {course.progress || 0}% Completed
-                  </p>
                 </div>
               </div>
             ))}
@@ -269,38 +247,38 @@ const StudentCourses = () => {
       {/* RECOMMENDED COURSES */}
       <section>
         <h2 className="text-lg sm:text-xl font-semibold mb-4">Recommended for You</h2>
+
         {recommended.length === 0 ? (
           <p className="text-gray-500 italic">No other courses available right now.</p>
         ) : (
           <div className="grid gap-6 md:grid-cols-2">
             {recommended.map((course) => (
               <div
-                key={course._id || course.title}
-                className="bg-white w-full rounded-2xl p-5 shadow-sm border border-gray-200 hover:shadow-lg transition flex gap-4 items-center"
+                key={course._id}
+                className="bg-white w-full rounded-2xl p-5 shadow-sm border border-gray-200 hover:shadow-lg transition"
               >
-                <img
-                  src={getImageUrl(course.image)}
-                  alt={course.title}
-                  className="w-24 h-24 object-cover rounded-xl shadow flex-shrink-0"
-                />
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">
-                    {course.title}
-                  </h3>
-                  <p className="text-xs text-gray-600 mb-3 line-clamp-2">
-                    {course.description?.slice(0, 90) || "Learn more about this course."}
-                  </p>
-                  <button
-                    onClick={() => handleEnroll(course._id)}
-                    disabled={enrollingCourseId === course._id}
-                    className={`text-xs px-4 py-2 rounded-lg text-white ${
-                      enrollingCourseId === course._id
-                        ? "bg-gray-400 cursor-not-allowed"
-                        : "bg-blue-600 hover:bg-blue-700"
-                    }`}
-                  >
-                    {enrollingCourseId === course._id ? "Enrolling..." : "Enroll Now"}
-                  </button>
+                <div className="flex gap-4 items-center">
+                  {course.image && (
+                    <img
+                      src={course.image}
+                      alt={course.title}
+                      className="w-20 h-20 object-cover rounded-xl shadow"
+                    />
+                  )}
+
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 mb-1">{course.title}</h3>
+                    <p className="text-xs text-gray-600 mb-3 line-clamp-2">
+                      {course.description?.slice(0, 90) || "Learn more about this course."}
+                    </p>
+
+                    <button
+                      onClick={() => handleEnroll(course._id)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 py-2 rounded-lg"
+                    >
+                      Enroll Now
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

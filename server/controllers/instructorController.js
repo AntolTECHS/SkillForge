@@ -2,6 +2,39 @@ import Course from "../models/Course.js";
 import Quiz from "../models/Quiz.js";
 import Enrollment from "../models/Enrollment.js";
 import User from "../models/User.js";
+import cloudinary from "cloudinary";
+import fs from "fs";
+
+// ---------------- Cloudinary Config ----------------
+cloudinary.v2.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+/* ==========================
+   Helper Functions
+========================== */
+
+/**
+ * Upload a file to Cloudinary and remove local file
+ */
+const uploadFileToCloudinary = async (filePath, folder, resourceType = "auto") => {
+  const result = await cloudinary.v2.uploader.upload(filePath, { folder, resource_type: resourceType });
+  fs.unlinkSync(filePath);
+  return result.secure_url;
+};
+
+/**
+ * Safely parse JSON with fallback
+ */
+const safeJSONParse = (str, fallback = []) => {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return fallback;
+  }
+};
 
 /* ============================================================
    🧑‍💼 Instructor Profile
@@ -10,12 +43,9 @@ import User from "../models/User.js";
 export const getProfile = async (req, res) => {
   try {
     const { name, email, notifications, darkMode } = req.user;
-    res.status(200).json({
-      success: true,
-      profile: { name, email, notifications, darkMode },
-    });
+    res.status(200).json({ success: true, profile: { name, email, notifications, darkMode } });
   } catch (err) {
-    console.error("❌ Error fetching profile:", err);
+    console.error("Error fetching profile:", err);
     res.status(500).json({ success: false, message: "Error fetching profile" });
   }
 };
@@ -33,7 +63,7 @@ export const updateProfile = async (req, res) => {
 
     res.status(200).json({ success: true, profile: req.user });
   } catch (err) {
-    console.error("❌ Error updating profile:", err);
+    console.error("Error updating profile:", err);
     res.status(500).json({ success: false, message: "Error updating profile" });
   }
 };
@@ -48,7 +78,30 @@ export const createCourse = async (req, res) => {
     if (!title || !description)
       return res.status(400).json({ success: false, message: "Title and description are required" });
 
-    const course = new Course({
+    // Parse lessons and quizzes
+    const content = safeJSONParse(req.body.content);
+    const quizzes = safeJSONParse(req.body.quizzes);
+
+    // Upload course thumbnail
+    let imageUrl = "";
+    if (req.files?.thumbnail?.[0]) {
+      imageUrl = await uploadFileToCloudinary(req.files.thumbnail[0].path, "course-thumbnails");
+    }
+
+    // Upload lesson files
+    const lessonFiles = req.files?.lessonFiles || [];
+    const updatedContent = await Promise.all(
+      content.map(async (lesson, idx) => {
+        if ((lesson.type === "video" || lesson.type === "pdf") && lessonFiles[idx]) {
+          lesson.url = await uploadFileToCloudinary(lessonFiles[idx].path, "course-lessons");
+        } else {
+          lesson.url = "";
+        }
+        return lesson;
+      })
+    );
+
+    const course = await Course.create({
       title,
       description,
       price,
@@ -57,30 +110,14 @@ export const createCourse = async (req, res) => {
       duration,
       instructor: req.user._id,
       isPublished: false,
-      quizzes: [],
-      content: [],
-      image: "", // unified field for thumbnail
+      content: updatedContent,
+      quizzes,
+      image: imageUrl,
     });
 
-    // Handle course image
-    if (req.files?.thumbnail?.[0]) {
-      course.image = `${req.protocol}://${req.get("host")}/uploads/${req.files.thumbnail[0].filename}`;
-    }
-
-    // Handle lesson files
-    if (req.files?.lessonFiles) {
-      course.content = req.files.lessonFiles.map((file) => ({
-        title: "",
-        type: file.mimetype.startsWith("video") ? "video" : "file",
-        url: `${req.protocol}://${req.get("host")}/uploads/${file.filename}`,
-      }));
-    }
-
-    await course.save();
-
-    res.status(201).json({ success: true, message: "✅ Course created successfully", course });
+    res.status(201).json({ success: true, message: "Course created successfully", course });
   } catch (err) {
-    console.error("❌ Error creating course:", err);
+    console.error("Error creating course:", err);
     res.status(500).json({ success: false, message: "Error creating course" });
   }
 };
@@ -94,52 +131,42 @@ export const updateCourse = async (req, res) => {
       return res.status(403).json({ success: false, message: "Not authorized to edit this course" });
 
     // Update basic fields
-    const fields = ["title", "description", "price", "category", "level", "duration"];
-    fields.forEach((field) => {
-      if (req.body[field] !== undefined) course[field] = req.body[field];
-    });
+    ["title", "description", "price", "category", "level", "duration"].forEach(
+      (field) => { if (req.body[field] !== undefined) course[field] = req.body[field]; }
+    );
 
-    // Update content JSON
+    // Update lessons/content
     if (req.body.content) {
-      try {
-        const parsedContent = JSON.parse(req.body.content);
-        if (req.files?.lessonFiles) {
-          req.files.lessonFiles.forEach((file, idx) => {
+      const parsedContent = safeJSONParse(req.body.content);
+      if (req.files?.lessonFiles) {
+        await Promise.all(
+          req.files.lessonFiles.map(async (file, idx) => {
             if (parsedContent[idx]) {
-              parsedContent[idx].url = `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
+              parsedContent[idx].url = await uploadFileToCloudinary(file.path, "course-lessons");
             }
-          });
-        }
-        course.content = parsedContent;
-      } catch {
-        return res.status(400).json({ success: false, message: "Invalid JSON for content" });
+          })
+        );
       }
+      course.content = parsedContent;
     }
 
-    // Update quizzes JSON
-    if (req.body.quizzes) {
-      try {
-        course.quizzes = JSON.parse(req.body.quizzes);
-      } catch {
-        return res.status(400).json({ success: false, message: "Invalid JSON for quizzes" });
-      }
-    }
+    // Update quizzes
+    if (req.body.quizzes) course.quizzes = safeJSONParse(req.body.quizzes);
 
-    // Update course image
+    // Update thumbnail
     if (req.files?.thumbnail?.[0]) {
-      course.image = `${req.protocol}://${req.get("host")}/uploads/${req.files.thumbnail[0].filename}`;
+      course.image = await uploadFileToCloudinary(req.files.thumbnail[0].path, "course-thumbnails");
     }
 
     await course.save();
-
     res.status(200).json({ success: true, message: "Course updated successfully", course });
   } catch (err) {
-    console.error("❌ Error updating course:", err);
+    console.error("Error updating course:", err);
     res.status(500).json({ success: false, message: "Error updating course" });
   }
 };
 
-export const publishCourse = async (req, res) => {
+export const togglePublishCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
     const course = await Course.findById(courseId);
@@ -152,11 +179,11 @@ export const publishCourse = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: course.isPublished ? "🎉 Course published successfully!" : "🚫 Course unpublished successfully!",
+      message: course.isPublished ? "Course published successfully" : "Course unpublished successfully",
       course,
     });
   } catch (err) {
-    console.error("❌ Error toggling publish:", err);
+    console.error("Error toggling publish:", err);
     res.status(500).json({ success: false, message: "Error publishing/unpublishing course" });
   }
 };
@@ -173,9 +200,9 @@ export const deleteCourse = async (req, res) => {
     await Enrollment.deleteMany({ course: course._id });
     await course.deleteOne();
 
-    res.status(200).json({ success: true, message: "🗑️ Course deleted successfully" });
+    res.status(200).json({ success: true, message: "Course deleted successfully" });
   } catch (err) {
-    console.error("❌ Error deleting course:", err);
+    console.error("Error deleting course:", err);
     res.status(500).json({ success: false, message: "Error deleting course" });
   }
 };
@@ -197,11 +224,7 @@ export const getMyCourses = async (req, res) => {
     const coursesWithStudentCount = await Promise.all(
       courses.map(async (course) => {
         const studentsCount = await Enrollment.countDocuments({ course: course._id });
-        return {
-          ...course.toObject(),
-          studentsCount,
-          image: course.image || null,
-        };
+        return { ...course.toObject(), studentsCount, image: course.image || null };
       })
     );
 
@@ -213,7 +236,7 @@ export const getMyCourses = async (req, res) => {
       pages: Math.ceil(total / limit),
     });
   } catch (err) {
-    console.error("❌ Error fetching courses:", err);
+    console.error("Error fetching courses:", err);
     res.status(500).json({ success: false, message: "Error fetching courses" });
   }
 };
@@ -234,7 +257,7 @@ export const getCourseById = async (req, res) => {
 
     res.status(200).json({ success: true, course: courseObj });
   } catch (err) {
-    console.error("❌ Error fetching course:", err);
+    console.error("Error fetching course:", err);
     res.status(500).json({ success: false, message: "Error fetching course details" });
   }
 };
@@ -260,9 +283,9 @@ export const addQuiz = async (req, res) => {
     course.quizzes.push(quiz._id);
     await course.save();
 
-    res.status(201).json({ success: true, message: "🧠 Quiz added successfully", quiz });
+    res.status(201).json({ success: true, message: "Quiz added successfully", quiz });
   } catch (err) {
-    console.error("❌ Error adding quiz:", err);
+    console.error("Error adding quiz:", err);
     res.status(500).json({ success: false, message: "Error adding quiz" });
   }
 };
@@ -302,7 +325,7 @@ export const getStudentsForInstructor = async (req, res) => {
 
     res.status(200).json({ success: true, students, total, page: Number(page), limit: Number(limit) });
   } catch (err) {
-    console.error("❌ Error fetching students:", err);
+    console.error("Error fetching students:", err);
     res.status(500).json({ success: false, message: "Error fetching students" });
   }
 };
@@ -317,20 +340,23 @@ export const getAvailableCourses = async (req, res) => {
       .populate("instructor", "name email")
       .lean();
 
-    const coursesWithUrls = courses.map((course) => ({
-      ...course,
-      image: course.image || "",
-      content: Array.isArray(course.content)
-        ? course.content.map((lesson) => ({
-            ...lesson,
-            url: lesson.url || "",
-          }))
-        : [],
-    }));
+    const coursesWithUrls = await Promise.all(
+      courses.map(async (course) => {
+        const studentsCount = await Enrollment.countDocuments({ course: course._id });
+        return {
+          ...course,
+          image: course.image || "",
+          studentsEnrolled: studentsCount,
+          content: Array.isArray(course.content)
+            ? course.content.map((lesson) => ({ ...lesson, url: lesson.url || "" }))
+            : [],
+        };
+      })
+    );
 
     res.json({ courses: coursesWithUrls });
   } catch (err) {
-    console.error("❌ Error fetching courses for students:", err);
+    console.error("Error fetching courses for students:", err);
     res.status(500).json({ success: false, message: "Failed to fetch courses for students" });
   }
 };

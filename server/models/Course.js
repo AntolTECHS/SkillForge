@@ -1,58 +1,45 @@
+// server/models/Course.js
 import mongoose from "mongoose";
 
-/* ========================
-   Lesson Schema
-======================== */
-const lessonSchema = new mongoose.Schema({
+const courseSchema = new mongoose.Schema({
   title: { type: String, required: true },
-  type: { type: String, enum: ["text", "video", "pdf"], default: "text" },
-  url: {
-    type: String,
-    required: function () {
-      return this.type !== "text";
+  description: { type: String, required: true },
+  price: { type: Number, default: 0 },
+  category: { type: String },
+  level: { type: String },
+  duration: { type: String },
+  instructor: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  isPublished: { type: Boolean, default: false },
+  content: [
+    {
+      title: String,
+      type: String,
+      contentText: String,
+      url: String,
+      quiz: [
+        {
+          question: String,
+          options: [String],
+          correctAnswer: Number,
+        },
+      ],
     },
-  },
-  contentText: {
-    type: String,
-    required: function () {
-      return this.type === "text";
-    },
-  },
+  ],
+  quizzes: [
+    { type: mongoose.Schema.Types.ObjectId, ref: "Quiz" },
+  ],
+  image: { type: String },
+}, { timestamps: true });
+
+// Optional: Virtual for students
+courseSchema.virtual("studentsEnrolled", {
+  ref: "Enrollment",
+  localField: "_id",
+  foreignField: "course",
 });
 
-/* ========================
-   Question Schema for Quizzes
-======================== */
-const questionSchema = new mongoose.Schema({
-  question: { type: String, required: true },
-  options: [{ type: String, required: true }],
-  correctAnswer: { type: String, required: true },
-});
+courseSchema.set("toObject", { virtuals: true });
+courseSchema.set("toJSON", { virtuals: true });
 
-/* ========================
-   Quiz Schema
-======================== */
-const quizSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  questions: [questionSchema],
-});
-
-/* ========================
-   Course Schema
-======================== */
-const courseSchema = new mongoose.Schema(
-  {
-    title: { type: String, required: true },
-    description: { type: String, required: true },
-    price: { type: Number, required: true },
-    category: { type: String, required: true },
-    instructor: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    thumbnail: { type: String }, // ✅ renamed from `image`
-    content: [lessonSchema], // lessons
-    quizzes: [quizSchema],   // quizzes
-    studentsEnrolled: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-  },
-  { timestamps: true }
-);
-
-export default mongoose.model("Course", courseSchema);
+const Course = mongoose.model("Course", courseSchema);
+export default Course; // ✅ Must be default
