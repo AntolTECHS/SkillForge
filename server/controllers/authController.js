@@ -39,7 +39,7 @@ export const registerStudent = async (req, res) => {
 };
 
 /**
- * @desc Login (all roles, temp password support)
+ * @desc Login (all roles, including temporary password support)
  * @route POST /api/auth/login
  * @access Public
  */
@@ -79,7 +79,11 @@ export const loginUser = async (req, res) => {
     if (!isPermanent && !isTemp)
       return res.status(400).json({ message: "Invalid credentials" });
 
-    const token = generateToken(user._id, user.role);
+    // ⛔ IMPORTANT FIX:
+    // user MUST change password if they logged in with a temporary one
+    const forcePasswordChange =
+      isTemp || user.forcePasswordChange || user.isFirstLogin;
+
     const safeUser = {
       _id: user._id,
       name: user.name,
@@ -89,7 +93,7 @@ export const loginUser = async (req, res) => {
       forcePasswordChange: user.forcePasswordChange,
     };
 
-    const forcePasswordChange = isTemp || user.forcePasswordChange || user.isFirstLogin;
+    const token = generateToken(user._id, user.role);
 
     return res.status(200).json({
       user: safeUser,
@@ -108,23 +112,25 @@ export const loginUser = async (req, res) => {
 };
 
 /**
- * @desc Change password (supports temporary password)
- * @route PUT or POST /api/auth/change-password
+ * @desc Change password (final fix — stops redirect loop)
+ * @route PUT /api/auth/change-password
  * @access Private
  */
 export const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
+
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({ message: "New password must be at least 6 characters" });
     }
 
     const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
 
     let validCurrent = false;
 
-    // Allow change if user is forced or first login, or current password matches permanent/temporary
+    // Allow password change WITHOUT current password if it is first login or temp pass usage
     if (user.forcePasswordChange || user.isFirstLogin) {
       validCurrent = true;
     } else if (currentPassword) {
@@ -132,30 +138,41 @@ export const changePassword = async (req, res) => {
       const matchTemp =
         user.tempPasswordHash &&
         (await user.matchTempPassword(currentPassword));
+
       validCurrent = matchPermanent || matchTemp;
     }
 
     if (!validCurrent)
       return res.status(400).json({ message: "Current password is incorrect" });
 
-    // Update password and clear temp fields
+    // Update password
     await user.setPassword(newPassword);
+
+    // Clear temporary password fields
     user.tempPasswordHash = null;
     user.tempPasswordExpiry = null;
+
+    // FINAL FIX — stop redirect loop
     user.forcePasswordChange = false;
     user.isFirstLogin = false;
 
     await user.save();
 
     const token = generateToken(user._id, user.role);
+
     return res.status(200).json({
       message: "Password changed successfully",
+
+      // MUST return updated flags back to frontend
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
+        isFirstLogin: user.isFirstLogin,             // now FALSE
+        forcePasswordChange: user.forcePasswordChange // now FALSE
       },
+
       token,
     });
   } catch (error) {
@@ -172,7 +189,8 @@ export const changePassword = async (req, res) => {
 export const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
 
     const safeUser = {
       _id: user._id,

@@ -15,7 +15,6 @@ import adminRoutes from "./routes/adminRoutes.js";
 import instructorRoutes from "./routes/instructorRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import courseRoutes from "./routes/courseRoutes.js";
-import paymentRoutes from "./routes/paymentRoutes.js";
 import enrollmentRoutes from "./routes/enrollmentRoutes.js";
 import openRouterRoutes from "./routes/openRouterRoutes.js"; // SkillForge AI
 import communityPostsRoutes from "./routes/posts.js";
@@ -76,7 +75,6 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/instructor", instructorRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/courses", courseRoutes);
-app.use("/api/payment", paymentRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
 app.use("/api/skillforge", openRouterRoutes);
 

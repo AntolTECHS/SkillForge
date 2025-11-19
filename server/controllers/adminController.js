@@ -1,7 +1,6 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import User from "../models/User.js";
-import Payment from "../models/Payment.js";
 import Enrollment from "../models/Enrollment.js";
 import Course from "../models/Course.js";
 import Certificate from "../models/Certificate.js";

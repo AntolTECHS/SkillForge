@@ -19,6 +19,7 @@ export const AuthProvider = ({ children }) => {
       return null;
     }
   });
+
   const [firstLogin, setFirstLogin] = useState(localStorage.getItem("firstLogin") === "true");
   const [loading, setLoading] = useState(true);
   const [authenticating, setAuthenticating] = useState(false);
@@ -54,7 +55,10 @@ export const AuthProvider = ({ children }) => {
       setUser(fetchedUser);
       localStorage.setItem("user", JSON.stringify(fetchedUser));
 
-      if (fetchedUser.role === "instructor" && (fetchedUser.isFirstLogin || fetchedUser.forcePasswordChange)) {
+      if (
+        fetchedUser.role === "instructor" &&
+        (fetchedUser.isFirstLogin || fetchedUser.forcePasswordChange)
+      ) {
         setFirstLogin(true);
         localStorage.setItem("firstLogin", "true");
       } else {
@@ -92,17 +96,14 @@ export const AuthProvider = ({ children }) => {
   }, [validateSession, user]);
 
   /* =========================
-     Login
+     Login (after OTP)
   ========================== */
   const login = async (email, password) => {
     setAuthenticating(true);
     try {
       const payload = { email: email.trim(), password: password.trim() };
-      console.group("[auth.login] Attempt");
-      console.log("Login payload:", payload);
 
       const res = await axios.post("/auth/login", payload);
-      console.log("Server response:", res.data);
 
       const token = res.data?.token;
       const returnedUser = res.data?.user;
@@ -115,6 +116,7 @@ export const AuthProvider = ({ children }) => {
       setUser(returnedUser);
       localStorage.setItem("user", JSON.stringify(returnedUser));
 
+      // FORCE PASSWORD CHANGE HERE
       if (res.data?.forcePasswordChange) {
         setFirstLogin(true);
         localStorage.setItem("firstLogin", "true");
@@ -123,20 +125,9 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem("firstLogin");
       }
 
-      console.groupEnd();
       return res.data;
     } catch (err) {
-      console.group("[auth.login] Error");
-      if (err.response) {
-        console.error("Status:", err.response.status);
-        console.error("Data:", err.response.data);
-        console.groupEnd();
-        throw err.response.data || { message: "Login failed" };
-      } else {
-        console.error("Error message:", err.message);
-        console.groupEnd();
-        throw { message: err.message || "Login failed" };
-      }
+      throw err.response?.data || { message: "Login failed" };
     } finally {
       setAuthenticating(false);
     }
@@ -150,6 +141,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const payload = { name: name.trim(), email: email.trim(), password: password.trim() };
       const res = await axios.post("/auth/register", payload);
+
       const token = res.data?.token;
       const returnedUser = res.data?.user;
 
@@ -163,7 +155,6 @@ export const AuthProvider = ({ children }) => {
 
       return res.data;
     } catch (err) {
-      console.error("[auth.register] error:", err.response?.data || err.message);
       throw err.response?.data || { message: "Registration failed" };
     } finally {
       setAuthenticating(false);
@@ -180,6 +171,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("firstLogin");
+
       delete axios.defaults.headers.common["Authorization"];
       setUser(null);
       setFirstLogin(false);
@@ -187,18 +179,26 @@ export const AuthProvider = ({ children }) => {
   };
 
   /* =========================
-     Change Password
+     Change Password (FIXED)
   ========================== */
   const changePassword = async ({ currentPassword, newPassword }) => {
     try {
       attachTokenToAxios();
-      const payload = { newPassword };
-      if (currentPassword) payload.currentPassword = currentPassword;
 
-      const res = await axios.post("/auth/change-password", payload);
+      const res = await axios.post("/auth/change-password", {
+        currentPassword,
+        newPassword,
+      });
+
+      // 🔥 IMPORTANT FIX: stop redirect loop
+      setFirstLogin(false);
+      localStorage.removeItem("firstLogin");
+
+      // 🔥 Refresh user so backend flags update
+      await refreshUser();
+
       return res.data;
     } catch (err) {
-      console.error("[auth.changePassword] error:", err.response?.data || err.message);
       throw err.response?.data || { message: "Failed to change password" };
     }
   };
@@ -214,7 +214,10 @@ export const AuthProvider = ({ children }) => {
       setUser(fetchedUser);
       localStorage.setItem("user", JSON.stringify(fetchedUser));
 
-      if (fetchedUser.role === "instructor" && (fetchedUser.isFirstLogin || fetchedUser.forcePasswordChange)) {
+      if (
+        fetchedUser.role === "instructor" &&
+        (fetchedUser.isFirstLogin || fetchedUser.forcePasswordChange)
+      ) {
         setFirstLogin(true);
         localStorage.setItem("firstLogin", "true");
       } else {
@@ -223,8 +226,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       return fetchedUser;
-    } catch (err) {
-      console.warn("Failed to refresh user:", err?.response?.data || err.message);
+    } catch {
       return null;
     }
   };

@@ -6,17 +6,20 @@ const certificateSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true, // Faster lookups for /me route
     },
 
     course: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Course",
       required: true,
+      index: true,
     },
 
     certificateUrl: {
-      type: String, // Cloudinary or generated PDF URL
+      type: String, // URL of generated PDF or Cloudinary file
       required: true,
+      trim: true,
     },
 
     issueDate: {
@@ -25,6 +28,15 @@ const certificateSchema = new mongoose.Schema(
     },
   },
   { timestamps: true }
+);
+
+/**
+ * Prevent issuing duplicate certificates for
+ * the same student and the same course.
+ */
+certificateSchema.index(
+  { student: 1, course: 1 },
+  { unique: true }
 );
 
 const Certificate = mongoose.model("Certificate", certificateSchema);

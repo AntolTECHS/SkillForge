@@ -1,6 +1,11 @@
-// AdminDashboard.jsx
-// Updated: Attendance, Payments and Certificates removed from sidebar and UI tabs.
+// cleaned card layout
+/* Enhanced StatCard styles inserted by assistant: 
+   - grid: 2 cols (mobile), 3 cols (md/tablet), 5 cols (lg)
+   - each StatCard wrapped with rounded shadow, hover lift, and subtle translucent background
+   If you use Tailwind, these classes apply out of the box. */
 
+
+// AdminDashboard.jsx
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "../../api/axios";
@@ -40,7 +45,7 @@ import {
 const DEFAULT_PLACEHOLDER = "https://placehold.co/120x80";
 
 /* -------------------------
-   Pure helpers
+   Pure helpers (defined before hooks so no hoisting issues)
    ------------------------- */
 function pick(obj, paths = []) {
   if (!obj) return undefined;
@@ -104,7 +109,10 @@ const NAV_ITEMS = [
   { key: "Instructors", Icon: UserPlus },
   { key: "Courses", Icon: BookOpen },
   { key: "Enrollments", Icon: Users },
+  { key: "Attendance", Icon: CalendarCheck },
   { key: "Students", Icon: Users },
+  { key: "Payments", Icon: DollarSign },
+  { key: "Certificates", Icon: Award },
   { key: "Settings", Icon: Settings },
 ];
 
@@ -165,7 +173,11 @@ function Card({ children, className = "" }) {
 }
 
 /* -------------------------
-   InstructorForm component
+   Minimal InstructorForm component
+   ------------------------- */
+
+/* -------------------------
+   InstructorForm (admin can set instructor password)
    ------------------------- */
 function InstructorForm({ initial = null, onSave, onCancel }) {
   const [form, setForm] = useState({
@@ -176,7 +188,7 @@ function InstructorForm({ initial = null, onSave, onCancel }) {
     password: "",
   });
 
-  const [setPassword, setSetPassword] = useState(!initial);
+  const [setPassword, setSetPassword] = useState(!initial); // true when creating
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -310,6 +322,7 @@ function InstructorForm({ initial = null, onSave, onCancel }) {
           />
         </div>
 
+        {/* Password controls */}
         <div className="mt-2">
           {initial ? (
             <>
@@ -448,9 +461,8 @@ function InstructorForm({ initial = null, onSave, onCancel }) {
     </Card>
   );
 }
-
 /* -------------------------
-   CertificateGenerator - kept but not rendered in sidebar
+   Minimal CertificateGenerator component
    ------------------------- */
 function CertificateGenerator({ users = [], courses = [], onGenerate }) {
   const [userId, setUserId] = useState("");
@@ -583,7 +595,7 @@ export default function AdminDashboard() {
   const [certificates, setCertificates] = useState([]);
 
   const [editingInstructor, setEditingInstructor] = useState(null);
-  const [processingIds, setProcessingIds] = useState([]);
+  const [processingIds, setProcessingIds] = useState([]); // track ids for button disabling
 
   // Students tab state
   const [selectedStudents, setSelectedStudents] = useState(new Set());
@@ -596,6 +608,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const pollRef = useRef(null);
 
+  // determine current user and role
   const currentUser = useMemo(() => {
     try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
   }, []);
@@ -605,6 +618,7 @@ export default function AdminDashboard() {
     if (!course) return false;
     if (currentRole === 'admin') return true;
     if (currentRole === 'instructor') {
+      // check common instructor id/email fields on course
       const cid = pick(course, ['instructor._id','instructorId','teacherId','instructorId','teacherId']);
       const cemail = pick(course, ['instructor.email','instructorEmail','teacherEmail']);
       if (cid && (String(cid) === String(currentUser._id) || String(cid) === String(currentUser.id))) return true;
@@ -639,6 +653,7 @@ export default function AdminDashboard() {
         }
       }
 
+      // fallback: paginated fetch
       const accumulated = [];
       let page = 1;
       const pageSize = 200;
@@ -702,6 +717,7 @@ export default function AdminDashboard() {
       ] = await Promise.all([
         fetchResource("/admin/overview", null, {}),
         fetchResource("/admin/instructors", "/instructors", []),
+        // prefer public /courses first, fallback to /admin/courses
         fetchResource("/courses", "/admin/courses", []),
         fetchResource("/admin/enrollments", "/enrollments", []),
         fetchResource("/admin/attendance", "/attendance", []),
@@ -723,6 +739,7 @@ export default function AdminDashboard() {
         : coursesData?.courses ?? coursesData?.data ?? coursesData ?? [];
       setCourses(normalizedCourses);
 
+      // if nothing found, try common /api prefixed endpoints (some backends expose under /api/)
       if (!normalizedCourses || normalizedCourses.length === 0) {
         try {
           const resApi = await axios.get('/api/courses');
@@ -730,12 +747,13 @@ export default function AdminDashboard() {
           if (apiCourses && apiCourses.length) {
             setCourses(apiCourses);
           } else {
+            // try admin api path
             const resApi2 = await axios.get('/api/admin/courses').catch(() => ({}));
             const apiCourses2 = normalizeList(resApi2.data ?? resApi2);
             if (apiCourses2 && apiCourses2.length) setCourses(apiCourses2);
           }
         } catch (e) {
-          // ignore
+          // ignore if no /api endpoints
         }
       }
 
@@ -760,6 +778,9 @@ export default function AdminDashboard() {
     }
   }, [fetchAllEnrollments]);
 
+  /* -------------------------
+     Effects
+     ------------------------- */
   useEffect(() => {
     let mounted = true;
     const run = async () => {
@@ -772,10 +793,12 @@ export default function AdminDashboard() {
     };
   }, [fetchAllData]);
 
+  // close sidebar on tab change
   useEffect(() => {
     setSidebarOpen(false);
   }, [activeTab]);
 
+  // poll for "real-time" while on Overview
   useEffect(() => {
     if (activeTab === "Overview") {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -813,18 +836,22 @@ export default function AdminDashboard() {
     async (form) => {
       try {
         if (editingInstructor && editingInstructor._id) {
+          // Update path: try admin first, fallback only on network/404.
           try {
             await axios.put(`/admin/instructors/${editingInstructor._id}`, form);
           } catch (err) {
             const status = err?.response?.status;
             if (!err.response || status === 404) {
+              // Try the public endpoint as a fallback (server might mount admin routes differently)
               await axios.put(`/instructors/${editingInstructor._id}`, form);
             } else {
+              // Validation/auth errors (400/401/403) should be surfaced, do not retry.
               throw err;
             }
           }
           setEditingInstructor(null);
         } else {
+          // Create path: try admin endpoint first, fallback only on network/404.
           let created = null;
           try {
             const res = await axios.post("/admin/instructors", form);
@@ -835,10 +862,12 @@ export default function AdminDashboard() {
               const res2 = await axios.post("/instructors", form);
               created = res2?.data ?? res2;
             } else {
+              // For 400/401/403/etc - do not retry. Surface to caller.
               throw err;
             }
           }
 
+          // After successful creation, attempt to send welcome email (server must implement endpoint)
           try {
             const id = created?._id ?? created?.id;
             if (id && form.password) {
@@ -865,6 +894,7 @@ export default function AdminDashboard() {
         await fetchAllData();
         setActiveTab("Instructors");
       } catch (err) {
+        // Show the most informative message available
         alert(err?.response?.data?.message || err?.message || "Error saving instructor");
       }
     },
@@ -971,6 +1001,7 @@ export default function AdminDashboard() {
     [fetchAllData]
   );
 
+  // COURSES SYNC: attempts several likely endpoints, then refreshes data
   const handleSyncCoursera = useCallback(async () => {
     if (!confirm("Fetch & save Coursera courses to the platform?")) return;
     addProcessing("sync-coursera");
@@ -1073,11 +1104,15 @@ export default function AdminDashboard() {
     [fetchAllData]
   );
 
+  // update course: admin or instructor (their own courses)
+  
+  // update course: admin or instructor (their own courses)
   const saveCourse = useCallback(async (updatedFields) => {
     if (!editingCourse) return;
     addProcessing(editingCourse._id ?? editingCourse.id ?? 'course-save');
     try {
       const id = editingCourse._id ?? editingCourse.id;
+      // Common endpoint candidates (various prefix combos)
       const endpoints = [
         `/admin/courses/${id}`,
         `/courses/${id}`,
@@ -1091,28 +1126,40 @@ export default function AdminDashboard() {
       let success = false;
       const base = axios?.defaults?.baseURL || "";
 
+      // helper to attempt a single URL (absolute or relative)
       const attempt = async (url) => {
         if (!url || tried.includes(url)) return false;
         tried.push(url);
         try {
+          console.log("Attempting course update:", url);
+          // If url looks absolute (starts with http) axios will use it as-is.
           await axios.put(url, updatedFields);
           return true;
         } catch (err) {
+          // record failures for debugging
+          console.warn("Update attempt failed for", url, err?.response?.status, err?.response?.data);
           return false;
         }
       };
 
       for (const ep of endpoints) {
+        // try as-is
         if (await attempt(ep)) { success = true; break; }
+
+        // try stripping leading /api if present and server might already mount /api as baseURL
         if (ep.startsWith("/api")) {
           const withoutApi = ep.replace(/^\/api/, "");
           if (await attempt(withoutApi)) { success = true; break; }
         }
+
+        // try absolute URL if axios.defaults.baseURL is set
         if (base) {
           try {
             const baseNoSlash = base.replace(/\/$/, "");
             const full = baseNoSlash + ep;
             if (await attempt(full)) { success = true; break; }
+
+            // also try when base contains /api and ep has /api (to avoid double /api)
             if (baseNoSlash.includes("/api")) {
               const baseStripApi = baseNoSlash.replace(/\/api\/?$/, "");
               const epStripApi = ep.replace(/^\/api/, "");
@@ -1125,9 +1172,11 @@ export default function AdminDashboard() {
         }
       }
 
+      // if no PUT succeeded, try PATCH on tried URLs
       if (!success) {
         for (const url of tried) {
           try {
+            console.log("Attempting PATCH fallback:", url);
             await axios.patch(url, updatedFields);
             success = true;
             break;
@@ -1150,6 +1199,8 @@ export default function AdminDashboard() {
     }
   }, [editingCourse, fetchAllData]);
 
+
+  // bulk student actions
   const toggleSelectStudent = (id) => {
     setSelectedStudents((s) => {
       const next = new Set(s);
@@ -1353,9 +1404,11 @@ export default function AdminDashboard() {
     </aside>
   );
 
+  // Overview: always use live computed counts (users & enrollments)
   const OverviewTab = () => {
     const preview = (items) => (Array.isArray(items) ? items.slice(0, 3) : []);
 
+    // live counts
     const registeredUsersCount = users.length;
 
     const uniqueLearnersFromEnrollments = useMemo(() => {
@@ -1371,6 +1424,7 @@ export default function AdminDashboard() {
       return s.size;
     }, [enrollments]);
 
+    // computed live count (best-effort)
     const computedCount = Math.max(uniqueLearnersFromEnrollments, registeredUsersCount, 0);
 
     return (
@@ -1383,17 +1437,25 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-6">
-          <StatCard
+            <StatCard
             title="Total learners"
             value={computedCount}
             subtitle={"Live computed (users & enrollments)"}
             icon={Users}
             theme="blue"
           />
-          <StatCard title="Registered users (real-time)" value={registeredUsersCount} subtitle="From users API" icon={Users} theme="teal" />
-          <StatCard title="Unique enrolled learners" value={uniqueLearnersFromEnrollments} subtitle="Counted from enrollments" icon={UserPlus} theme="purple" />
-          <StatCard title="Courses" value={overview.totalCourses ?? courses.length} icon={BookOpen} theme="amber" />
-          <StatCard title="Instructors" value={overview.instructors ?? instructors.length} subtitle="Active instructors" icon={UserPlus} theme="teal" />
+
+            <StatCard title="Registered users (real-time)" value={registeredUsersCount} subtitle="From users API" icon={Users} theme="teal" />
+            <StatCard title="Unique enrolled learners" value={uniqueLearnersFromEnrollments} subtitle="Counted from enrollments" icon={UserPlus} theme="purple" />
+            <StatCard title="Courses" value={overview.totalCourses ?? courses.length} icon={BookOpen} theme="amber" />
+
+    <StatCard
+    title="Instructors"
+    value={overview.instructors ?? instructors.length}
+    subtitle="Active instructors"
+    icon={UserPlus}
+    theme="teal"
+  />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1467,6 +1529,9 @@ export default function AdminDashboard() {
     );
   };
 
+  /* -------------------------
+     Students tab
+     ------------------------- */
   const StudentsTab = () => {
     const [query, setQuery] = useState("");
 
@@ -1562,7 +1627,11 @@ export default function AdminDashboard() {
     );
   };
 
+  /* -------------------------
+     Other tabs (Courses, Enrollments, Attendance, Payments, Certificates, Settings)
+     ------------------------- */
   const CoursesTab = () => {
+    // normalize possible response shapes and ensure we have a simple array
     const list = normalizeList(courses.length ? courses : (courses?.courses ?? courses?.data ?? courses)) || [];
 
     return (
@@ -1809,10 +1878,11 @@ export default function AdminDashboard() {
               <div key={c._id ?? `cert-${m}`} className="flex items-center justify-between border rounded-lg p-3 bg-white">
                 <div>
                   <div className="font-medium">{c.userName || c.user?.name}</div>
-                  <div className="text-xs text-gray-500">{c.courseTitle || c.course?.title}</div>
+                  <div className="text-xs text-gray-500">{c.courseTitle || c.course?.title} • Issued {formatDate(c.issuedAt || c.createdAt)}</div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => revokeCertificateLocal(c._id)} className="px-2 py-1 bg-red-600 text-white rounded text-xs">Revoke</button>
+                  <a href={c.url || c.certificateUrl} target="_blank" rel="noreferrer" className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm">View</a>
+                  <button disabled={isProcessing(c._id)} onClick={() => revokeCertificateLocal(c._id)} className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm">Revoke</button>
                 </div>
               </div>
             ))}
@@ -1822,121 +1892,133 @@ export default function AdminDashboard() {
     </div>
   );
 
+  const SettingsTab = () => (
+    <Card>
+      <h3 className="text-lg font-semibold mb-4">Platform Settings</h3>
+      <p className="text-sm text-gray-600">Add toggles for registration, email config, featured courses, site branding, etc.</p>
+    </Card>
+  );
+
   /* -------------------------
-     Main render
+     Render
      ------------------------- */
+  if (loading) return <div className="p-8">Loading admin data…</div>;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
 
-      <div className="lg:pl-64">
-        <header className="flex items-center justify-between px-6 py-4 border-b bg-white">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded bg-gray-100">
-              <Menu className="w-5 h-5" />
+      <div className="flex-1 flex flex-col lg:ml-64">
+        <header className="bg-white shadow-sm px-4 py-3 flex items-center justify-between sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <button className="lg:hidden text-blue-900" onClick={() => setSidebarOpen(!sidebarOpen)}>
+              <Menu className="w-6 h-6" />
             </button>
-            <h1 className="text-xl font-semibold">Admin Dashboard</h1>
+            <h1 className="text-2xl font-bold text-blue-900 cursor-pointer" onClick={() => navigate("/")}>SkillForge</h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button onClick={fetchAllData} className="px-3 py-2 bg-gray-100 rounded text-sm">Refresh</button>
-            <button onClick={handleLogout} className="px-3 py-2 bg-red-600 text-white rounded text-sm">Logout</button>
-          </div>
+          <div className="text-sm text-gray-500 hidden sm:block">Admin Panel</div>
         </header>
 
         <main className="p-6">
-          {loading ? (
-            <div className="text-center py-20">Loading…</div>
-          ) : error ? (
-            <div className="text-red-600">{String(error)}</div>
-          ) : (
-            <div className="space-y-6">
-              {activeTab === "Overview" && <OverviewTab />}
-              {activeTab === "Instructors" && (
-                <Card>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">Instructors ({instructors.length})</h3>
-                    <div className="flex gap-2">
-                      <button onClick={() => fetchAllData()} className="px-3 py-1 bg-gray-200 rounded text-sm">Refresh</button>
-                      <button onClick={() => setEditingInstructor({})} className="px-3 py-1 bg-blue-700 text-white rounded text-sm">Add</button>
-                    </div>
-                  </div>
+          {error && <div className="mb-4 text-red-600">{error}</div>}
 
-                  {instructors.length === 0 ? (
-                    <p className="text-gray-500">No instructors yet.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {instructors.map((i) => (
-                        <div key={i._id ?? i.id} className="flex items-center justify-between border rounded-lg p-3">
-                          <div>
-                            <div className="font-medium">{i.name}</div>
-                            <div className="text-xs text-gray-500">{i.email}</div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button onClick={() => editInstructor(i)} className="px-3 py-1 bg-yellow-500 text-white rounded text-sm"><Edit2 className="w-4 h-4" /> Edit</button>
-                            <button disabled={isProcessing(i._id)} onClick={() => deleteInstructor(i._id)} className="px-3 py-1 bg-red-600 text-white rounded text-sm"><Trash2 className="w-4 h-4" /></button>
-                          </div>
-                        </div>
-                      ))}
+          <div className="space-y-6">
+            {activeTab === "Overview" && <OverviewTab />}
+            {activeTab === "Instructors" && (
+              <section className="grid md:grid-cols-2 gap-6">
+                <div><InstructorForm initial={editingInstructor} onSave={saveInstructor} onCancel={() => setEditingInstructor(null)} /></div>
+                <div>
+                  <Card>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold">Instructors ({instructors.length})</h3>
+                      <div className="text-sm text-gray-500">Manage instructors</div>
                     </div>
-                  )}
-                </Card>
-              )}
-              {activeTab === "Courses" && <CoursesTab />}
-              {activeTab === "Enrollments" && <EnrollmentsTab />}
-              {activeTab === "Students" && <StudentsTab />}
-              {/* Attendance, Payments, Certificates UI removed from main tabs */}
-              {activeTab === "Settings" && (
-                <Card>
-                  <h3 className="text-lg font-semibold mb-3">Settings</h3>
-                  <div className="text-sm text-gray-600">General site settings and configuration controls can go here.</div>
-                </Card>
-              )}
-            </div>
-          )}
+
+                    {instructors.length === 0 ? (
+                      <p className="text-gray-500">No instructors yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {instructors.map((inst, idx) => (
+                          <div key={inst._id ?? `inst-${idx}`} className="flex items-center gap-4 border rounded-lg p-3">
+                            <img src={inst.image || "https://cdn-icons-png.flaticon.com/512/194/194938.png"} alt={inst.name} className="w-12 h-12 rounded-full object-cover" />
+                            <div className="flex-1">
+                              <div className="font-medium">{inst.name}</div>
+                              <div className="text-xs text-gray-500">{inst.email}</div>
+                              <div className="text-xs text-gray-400 line-clamp-2">{inst.bio}</div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => editInstructor(inst)} className="px-2 py-2 bg-gray-100 rounded hover:bg-gray-200" title="Edit">
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button disabled={isProcessing(inst._id)} onClick={() => deleteInstructor(inst._id)} className="px-2 py-2 bg-red-600 text-white rounded hover:bg-red-500" title="Delete">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </Card>
+                </div>
+              </section>
+            )}
+            {activeTab === "Courses" && <CoursesTab />}
+            {activeTab === "Enrollments" && <EnrollmentsTab />}
+            {activeTab === "Attendance" && <AttendanceTab />}
+            {activeTab === "Students" && <StudentsTab />}
+            {activeTab === "Payments" && <PaymentsTab />}
+            {activeTab === "Certificates" && <CertificatesTab />}
+            {activeTab === "Settings" && <SettingsTab />}
+          </div>
         </main>
       </div>
-
-      {/* Editor modals */}
-      {editingInstructor && <div className="fixed inset-0 z-50 flex items-center justify-center"><div className="bg-black/40 inset-0 absolute" /><div className="relative w-full max-w-2xl p-4"><InstructorForm initial={editingInstructor._id ? editingInstructor : null} onSave={saveInstructor} onCancel={() => setEditingInstructor(null)} /></div></div>}
     </div>
   );
 }
 
 /* -------------------------
-   Helper modal component used above
-   (kept minimal to avoid missing reference errors)
+   StudentDetailsModal (placed at bottom to avoid hoisting-coupling)
    ------------------------- */
-function StudentDetailsModal({ student, enrollments = [], onClose }) {
+function StudentDetailsModal({ student, onClose, enrollments }) {
   if (!student) return null;
-  const myEnrolls = (enrollments || []).filter((e) => {
-    const sid = e.studentId ?? pick(e, ["student._id", "student.id", "userId", "user._id"]) ?? e.studentEmail;
-    const key = student._id ?? student.id ?? student.email;
-    return String(sid) === String(key) || String(sid) === String(student.email);
+  const studentEnrolls = (enrollments || []).filter((e) => {
+    const sid = e.studentId ?? pick(e, ["student._id", "student.id", "studentId"]);
+    const matchKey = student._id || student.id || student.email;
+    return String(sid) === String(matchKey) || String(sid) === String(student.email);
   });
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="bg-black/40 absolute inset-0" onClick={onClose} />
-      <div className="bg-white rounded-2xl p-6 z-10 w-full max-w-2xl">
-        <div className="flex items-center justify-between mb-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-2xl">
+        <div className="flex items-start justify-between mb-4">
           <h4 className="text-lg font-semibold">{student.name || student.email}</h4>
           <button onClick={onClose} className="text-gray-500"><X /></button>
         </div>
 
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-3">
           <div className="text-sm text-gray-600">Email: {student.email}</div>
-          <div className="text-sm text-gray-600">Enrolled in {myEnrolls.length} course(s)</div>
-
-          <div className="mt-3">
-            <h5 className="font-semibold">Enrollments</h5>
-            {myEnrolls.length === 0 ? <div className="text-sm text-gray-500">No enrollments</div> : (
-              <ul className="text-sm">
-                {myEnrolls.map((e, i) => (
-                  <li key={e._id ?? i} className="py-1 border-b">{e.courseTitle || e.course?.title || "Course"}</li>
+          <div className="text-sm text-gray-600">Role: {student.role || "student"}</div>
+          <div className="text-sm text-gray-600">Enrolled courses: {studentEnrolls.length}</div>
+          <div>
+            <h5 className="font-medium mt-2">Recent enrollments</h5>
+            {studentEnrolls.length === 0 ? (
+              <div className="text-sm text-gray-500">No enrollments</div>
+            ) : (
+              <ul className="text-sm space-y-1">
+                {studentEnrolls.slice(0, 5).map((e, i) => (
+                  <li key={e._id ?? i} className="flex justify-between">
+                    <span>{e.courseTitle || e.course?.title || "Untitled course"}</span>
+                    <span className="text-gray-400">{formatDate(e.createdAt || e.enrolledAt || Date.now())}</span>
+                  </li>
                 ))}
               </ul>
             )}
           </div>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button onClick={onClose} className="px-3 py-1 bg-gray-200 rounded">Close</button>
         </div>
       </div>
     </div>

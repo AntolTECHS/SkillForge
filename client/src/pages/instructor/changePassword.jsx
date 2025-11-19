@@ -1,5 +1,5 @@
 // src/pages/instructor/changePassword.jsx
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Lock, AlertCircle, Eye, EyeOff } from "lucide-react";
@@ -7,22 +7,24 @@ import { Lock, AlertCircle, Eye, EyeOff } from "lucide-react";
 const ChangePassword = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { changePassword, user, firstLogin } = useAuth();
+  const { changePassword, user } = useAuth();
 
   const email = location.state?.email || user?.email || "";
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // hide current password if forced first login
-  const requireCurrentPassword = !firstLogin;
+  // FIX: your backend uses isFirstLogin
+  const requireCurrentPassword = !user?.isFirstLogin;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -58,15 +60,18 @@ const ChangePassword = () => {
       });
 
       setSuccess("Password changed successfully! Redirecting...");
+
       setTimeout(() => {
-        // Redirect based on role
         if (user?.role === "instructor") navigate("/instructor/dashboard");
         else if (user?.role === "admin") navigate("/admin/dashboard");
         else navigate("/student/dashboard");
       }, 1500);
     } catch (err) {
       console.error("[ChangePassword] error:", err);
-      const msg = err?.message || err?.data?.message || "Failed to change password";
+      const msg =
+        err?.message ??
+        err?.data?.message ??
+        "Failed to change password";
       setError(msg);
     } finally {
       setLoading(false);
