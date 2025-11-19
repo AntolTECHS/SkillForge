@@ -15,14 +15,13 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    // Format: fieldname-timestamp-originalname.ext
     const ext = path.extname(file.originalname);
     const name = path.basename(file.originalname, ext).replace(/\s+/g, "-");
     cb(null, `${file.fieldname}-${Date.now()}-${name}${ext}`);
   },
 });
 
-// File filter (optional: accept only certain file types)
+// File filter
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|gif|mp4|pdf|mov|webm/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -41,8 +40,8 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max per file
 });
 
-// Middleware to handle course image + lesson files
+// Updated middleware: match frontend field names
 export const uploadCourseFiles = upload.fields([
-  { name: "image", maxCount: 1 },  // single course thumbnail
-  { name: "files", maxCount: 20 }, // multiple lesson files
+  { name: "thumbnail", maxCount: 1 },   // course thumbnail
+  { name: "lessonFiles", maxCount: 50 } // lesson video/pdf files
 ]);

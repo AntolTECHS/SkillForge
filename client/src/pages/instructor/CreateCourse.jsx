@@ -13,21 +13,16 @@ const CreateCourse = () => {
       {
         title: "",
         type: "text",
-        file: null,
         contentText: "",
-        quiz: [
-          {
-            question: "",
-            options: ["", "", "", ""],
-            correctAnswer: 0,
-          },
-        ],
+        file: null,
+        quiz: [{ question: "", options: ["", "", "", ""], correctAnswer: 0 }],
       },
     ],
   });
 
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   /** ------------------ Lesson Handlers ------------------ **/
   const handleAddLesson = () => {
@@ -38,8 +33,8 @@ const CreateCourse = () => {
         {
           title: "",
           type: "text",
-          file: null,
           contentText: "",
+          file: null,
           quiz: [{ question: "", options: ["", "", "", ""], correctAnswer: 0 }],
         },
       ],
@@ -125,27 +120,41 @@ const CreateCourse = () => {
       const token = localStorage.getItem("token");
       const formData = new FormData();
 
-      formData.append("title", course.title);
-      formData.append("description", course.description);
-      formData.append("price", course.price);
-      formData.append("category", course.category);
+      // Basic info
+      ["title", "description", "price", "category"].forEach((field) =>
+        formData.append(field, course[field])
+      );
 
+      // Thumbnail
       if (course.thumbnail) formData.append("thumbnail", course.thumbnail);
 
-      formData.append("content", JSON.stringify(course.content));
+      // Lessons content
+      // Include quizzes inside lessons
+      formData.append(
+        "content",
+        JSON.stringify(
+          course.content.map(({ title, type, contentText, file, quiz }) => ({
+            title,
+            type,
+            contentText,
+            quiz: quiz.map((q) => ({
+              question: q.question,
+              options: q.options,
+              correctAnswer: q.correctAnswer,
+            })),
+          }))
+        )
+      );
 
-      // Add lesson files
+      // Lesson files
       course.content.forEach((lesson) => {
         if ((lesson.type === "video" || lesson.type === "pdf") && lesson.file) {
           formData.append("lessonFiles", lesson.file);
         }
       });
 
-      await axios.post(`${process.env.REACT_APP_API_URL || "http://localhost:5000"}/api/courses`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
+      await axios.post(`${API_URL}/api/courses`, formData, {
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
       });
 
       navigate("/instructor/my-courses");
@@ -160,7 +169,6 @@ const CreateCourse = () => {
   return (
     <div className="max-w-5xl mx-auto p-6 font-sans">
       <h1 className="text-3xl font-bold mb-6">Create New Course</h1>
-
       <form className="bg-white shadow rounded-xl p-6 space-y-6" onSubmit={handleSubmit}>
         {/* Course Info */}
         <input
@@ -171,7 +179,6 @@ const CreateCourse = () => {
           className="w-full border border-gray-300 rounded-lg px-3 py-2"
           required
         />
-
         <textarea
           placeholder="Course Description"
           value={course.description}
@@ -180,7 +187,6 @@ const CreateCourse = () => {
           rows="4"
           required
         />
-
         <div className="grid grid-cols-2 gap-4">
           <input
             type="number"
@@ -231,7 +237,6 @@ const CreateCourse = () => {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-2"
                 required
               />
-
               <select
                 value={lesson.type}
                 onChange={(e) => handleLessonChange(index, "type", e.target.value)}
@@ -252,7 +257,6 @@ const CreateCourse = () => {
                   required
                 />
               )}
-
               {(lesson.type === "video" || lesson.type === "pdf") && (
                 <>
                   <input
@@ -261,11 +265,13 @@ const CreateCourse = () => {
                     className="w-full mb-2"
                     required
                   />
-                  {lesson.file && <p className="text-sm text-gray-600">Selected file: {lesson.file.name}</p>}
+                  {lesson.file && (
+                    <p className="text-sm text-gray-600">Selected file: {lesson.file.name}</p>
+                  )}
                 </>
               )}
 
-              {/* Quiz per lesson */}
+              {/* Quiz */}
               <div className="mt-3">
                 <h3 className="font-semibold mb-2">Lesson Quiz</h3>
                 {lesson.quiz.map((q, qIndex) => (
@@ -278,7 +284,6 @@ const CreateCourse = () => {
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-1"
                       required
                     />
-
                     {q.options.map((opt, optIndex) => (
                       <input
                         key={optIndex}
@@ -290,7 +295,6 @@ const CreateCourse = () => {
                         required
                       />
                     ))}
-
                     <select
                       value={q.correctAnswer}
                       onChange={(e) => handleCorrectAnswerChange(index, qIndex, e.target.value)}
@@ -302,7 +306,6 @@ const CreateCourse = () => {
                         </option>
                       ))}
                     </select>
-
                     {lesson.quiz.length > 1 && (
                       <button
                         type="button"
@@ -314,7 +317,6 @@ const CreateCourse = () => {
                     )}
                   </div>
                 ))}
-
                 <button
                   type="button"
                   onClick={() => handleAddQuestion(index)}

@@ -1,59 +1,33 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useNavigate, useParams } from "react-router-dom";
 
 const EditCourse = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-  const [loading, setLoading] = useState(true);
   const [course, setCourse] = useState({
     title: "",
     description: "",
-    thumbnail: null,
-    price: 0,
+    price: "",
     category: "",
-    level: "",
-    duration: "",
-    content: [],
+    thumbnail: null,
+    content: [
+      {
+        title: "",
+        type: "text",
+        contentText: "",
+        file: null,
+        url: "",
+        quiz: [{ question: "", options: ["", "", "", ""], correctAnswer: 0 }],
+      },
+    ],
   });
+  const [loading, setLoading] = useState(false);
+  const [loadingCourse, setLoadingCourse] = useState(true);
 
-  const [thumbnailFile, setThumbnailFile] = useState(null);
-  const [lessonFiles, setLessonFiles] = useState({}); // index -> File
-
-  const API_URL = import.meta.env.VITE_API_URL;
-  const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-  const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
-  /** =========================
-   * Cloudinary Upload Helper
-   ========================= */
-  const uploadToCloudinary = async (file, type = "image") => {
-    if (!file) return "";
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", UPLOAD_PRESET);
-
-    let endpoint = "image/upload";
-    if (type === "video") endpoint = "video/upload";
-    if (type === "raw") endpoint = "raw/upload"; // for PDFs
-
-    try {
-      const res = await axios.post(
-        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${endpoint}`,
-        formData
-      );
-      return res.data.secure_url;
-    } catch (err) {
-      console.error("Cloudinary upload error:", err.response?.data || err.message);
-      alert("Cloudinary upload failed. Check file type & upload preset.");
-      return "";
-    }
-  };
-
-  /** =========================
-   * Fetch Course Data
-   ========================= */
+  /** ------------------ Fetch Existing Course ------------------ **/
   useEffect(() => {
     const fetchCourse = async () => {
       try {
@@ -68,230 +42,358 @@ const EditCourse = () => {
             ...lesson,
             quiz: lesson.quiz || [{ question: "", options: ["", "", "", ""], correctAnswer: 0 }],
           }));
-          setCourse({ ...courseData, content: contentWithQuiz });
-        } else {
-          alert("Course not found or access denied");
-          navigate("/instructor/my-courses");
+
+          setCourse({
+            title: courseData.title,
+            description: courseData.description,
+            price: courseData.price,
+            category: courseData.category,
+            thumbnail: courseData.image || null,
+            content: contentWithQuiz.map((lesson) => ({
+              title: lesson.title,
+              type: lesson.type,
+              contentText: lesson.contentText || "",
+              file: null,
+              url: lesson.url || "",
+              quiz: lesson.quiz,
+            })),
+          });
         }
       } catch (err) {
-        console.error(err);
-        alert("Failed to load course");
-        navigate("/instructor/my-courses");
+        console.error("Failed to fetch course", err);
       } finally {
-        setLoading(false);
+        setLoadingCourse(false);
       }
     };
 
     fetchCourse();
-  }, [courseId, navigate]);
+  }, [API_URL, courseId]);
 
-  /** =========================
-   * Handlers
-   ========================= */
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setCourse((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleThumbnailChange = (e) => {
-    const file = e.target.files[0];
-    setThumbnailFile(file);
-    setCourse((prev) => ({ ...prev, thumbnail: URL.createObjectURL(file) }));
-  };
-
-  const handleLessonFileChange = (e, idx) => {
-    setLessonFiles((prev) => ({ ...prev, [idx]: e.target.files[0] }));
-  };
-
-  const handleLessonChange = (idx, field, value) => {
-    setCourse((prev) => {
-      const newContent = [...prev.content];
-      newContent[idx][field] = value;
-      return { ...prev, content: newContent };
-    });
-  };
-
-  /** =========================
-   * Quiz Handlers
-   ========================= */
-  const handleAddQuestion = (lessonIdx) => {
-    setCourse((prev) => {
-      const newContent = [...prev.content];
-      newContent[lessonIdx].quiz.push({ question: "", options: ["", "", "", ""], correctAnswer: 0 });
-      return { ...prev, content: newContent };
-    });
-  };
-
-  const handleRemoveQuestion = (lessonIdx, qIdx) => {
-    setCourse((prev) => {
-      const newContent = [...prev.content];
-      newContent[lessonIdx].quiz.splice(qIdx, 1);
-      return { ...prev, content: newContent };
-    });
-  };
-
-  const handleQuestionChange = (lessonIdx, qIdx, field, value) => {
-    setCourse((prev) => {
-      const newContent = [...prev.content];
-      newContent[lessonIdx].quiz[qIdx][field] = value;
-      return { ...prev, content: newContent };
-    });
-  };
-
-  const handleOptionChange = (lessonIdx, qIdx, optIdx, value) => {
-    setCourse((prev) => {
-      const newContent = [...prev.content];
-      newContent[lessonIdx].quiz[qIdx].options[optIdx] = value;
-      return { ...prev, content: newContent };
-    });
-  };
-
-  const handleCorrectAnswerChange = (lessonIdx, qIdx, value) => {
-    setCourse((prev) => {
-      const newContent = [...prev.content];
-      newContent[lessonIdx].quiz[qIdx].correctAnswer = parseInt(value, 10);
-      return { ...prev, content: newContent };
-    });
-  };
-
-  /** =========================
-   * Lessons Add/Remove
-   ========================= */
-  const addLesson = () => {
+  /** ------------------ Lesson Handlers ------------------ **/
+  const handleAddLesson = () => {
     setCourse((prev) => ({
       ...prev,
       content: [
         ...prev.content,
-        { title: "", type: "text", contentText: "", quiz: [{ question: "", options: ["", "", "", ""], correctAnswer: 0 }] },
+        {
+          title: "",
+          type: "text",
+          contentText: "",
+          file: null,
+          quiz: [{ question: "", options: ["", "", "", ""], correctAnswer: 0 }],
+        },
       ],
     }));
   };
 
-  const removeLesson = (idx) => {
-    setCourse((prev) => ({ ...prev, content: prev.content.filter((_, i) => i !== idx) }));
-    setLessonFiles((prev) => {
-      const copy = { ...prev };
-      delete copy[idx];
-      return copy;
+  const handleRemoveLesson = (index) => {
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent.splice(index, 1);
+      return { ...prev, content: newContent };
     });
   };
 
-  /** =========================
-   * Submit Handler
-   ========================= */
+  const handleLessonChange = (index, field, value) => {
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[index][field] = value;
+      return { ...prev, content: newContent };
+    });
+  };
+
+  const handleFileChange = (index, file) => {
+    handleLessonChange(index, "file", file);
+  };
+
+  /** ------------------ Quiz Handlers ------------------ **/
+  const handleAddQuestion = (lessonIndex) => {
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIndex].quiz.push({
+        question: "",
+        options: ["", "", "", ""],
+        correctAnswer: 0,
+      });
+      return { ...prev, content: newContent };
+    });
+  };
+
+  const handleRemoveQuestion = (lessonIndex, questionIndex) => {
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIndex].quiz.splice(questionIndex, 1);
+      return { ...prev, content: newContent };
+    });
+  };
+
+  const handleQuestionChange = (lessonIndex, questionIndex, field, value) => {
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIndex].quiz[questionIndex][field] = value;
+      return { ...prev, content: newContent };
+    });
+  };
+
+  const handleOptionChange = (lessonIndex, questionIndex, optionIndex, value) => {
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIndex].quiz[questionIndex].options[optionIndex] = value;
+      return { ...prev, content: newContent };
+    });
+  };
+
+  const handleCorrectAnswerChange = (lessonIndex, questionIndex, value) => {
+    setCourse((prev) => {
+      const newContent = [...prev.content];
+      newContent[lessonIndex].quiz[questionIndex].correctAnswer = parseInt(value, 10);
+      return { ...prev, content: newContent };
+    });
+  };
+
+  /** ------------------ Thumbnail Handler ------------------ **/
+  const handleThumbnailChange = (file) => {
+    setCourse((prev) => ({ ...prev, thumbnail: file }));
+  };
+
+  /** ------------------ Submit ------------------ **/
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       const token = localStorage.getItem("token");
+      const formData = new FormData();
 
-      // Upload thumbnail if changed
-      let thumbnailUrl = null;
-      if (thumbnailFile) thumbnailUrl = await uploadToCloudinary(thumbnailFile, "image");
-
-      // Upload lesson files
-      const contentWithFiles = await Promise.all(
-        course.content.map(async (lesson, idx) => {
-          if ((lesson.type === "video" || lesson.type === "pdf") && lessonFiles[idx]) {
-            const type = lesson.type === "video" ? "video" : "raw"; // video or pdf/raw
-            const fileUrl = await uploadToCloudinary(lessonFiles[idx], type);
-            return { ...lesson, url: fileUrl };
-          }
-          return lesson;
-        })
+      ["title", "description", "price", "category"].forEach((field) =>
+        formData.append(field, course[field])
       );
 
-      // Prepare payload
-      const payload = {
-        title: course.title,
-        description: course.description,
-        price: course.price,
-        category: course.category,
-        level: course.level,
-        duration: course.duration,
-        content: contentWithFiles,
-      };
-      if (thumbnailUrl) payload.thumbnail = thumbnailUrl;
+      if (course.thumbnail instanceof File) formData.append("thumbnail", course.thumbnail);
 
-      const res = await axios.put(`${API_URL}/api/instructor/courses/${courseId}`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
+      formData.append(
+        "content",
+        JSON.stringify(
+          course.content.map(({ title, type, contentText, file, quiz }) => ({
+            title,
+            type,
+            contentText,
+            quiz: quiz.map((q) => ({
+              question: q.question,
+              options: q.options,
+              correctAnswer: q.correctAnswer,
+            })),
+          }))
+        )
+      );
+
+      course.content.forEach((lesson) => {
+        if ((lesson.type === "video" || lesson.type === "pdf") && lesson.file) {
+          formData.append("lessonFiles", lesson.file);
+        }
       });
 
-      if (res.data.success) {
-        alert("Course updated successfully!");
-        navigate("/instructor/my-courses");
-      } else {
-        alert(res.data.message || "Failed to update course");
-      }
+      await axios.put(`${API_URL}/api/instructor/courses/${courseId}`, formData, {
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
+      });
+
+      navigate("/instructor/my-courses");
     } catch (err) {
-      console.error("Course update error:", err.response?.data || err.message);
-      alert(err.response?.data?.message || "Error updating course");
+      console.error("Failed to update course", err);
+      alert("Failed to update course. Check console for details.");
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) return <div className="p-6 text-xl font-semibold">Loading course...</div>;
+  if (loadingCourse) return <div className="p-6 text-xl font-semibold">Loading course...</div>;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto p-6 font-sans">
       <h1 className="text-3xl font-bold mb-6">Edit Course</h1>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Course Details */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input type="text" name="title" value={course.title} onChange={handleChange} placeholder="Title" className="border rounded px-3 py-2" required />
-          <input type="text" name="category" value={course.category} onChange={handleChange} placeholder="Category" className="border rounded px-3 py-2" />
-          <input type="number" name="price" value={course.price} onChange={handleChange} placeholder="Price" className="border rounded px-3 py-2" min={0} required />
-          <input type="text" name="level" value={course.level} onChange={handleChange} placeholder="Level" className="border rounded px-3 py-2" />
-          <input type="text" name="duration" value={course.duration} onChange={handleChange} placeholder="Duration" className="border rounded px-3 py-2" />
+      <form className="bg-white shadow rounded-xl p-6 space-y-6" onSubmit={handleSubmit}>
+        {/* Course Info */}
+        <input
+          type="text"
+          placeholder="Course Title"
+          value={course.title}
+          onChange={(e) => setCourse({ ...course, title: e.target.value })}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2"
+          required
+        />
+        <textarea
+          placeholder="Course Description"
+          value={course.description}
+          onChange={(e) => setCourse({ ...course, description: e.target.value })}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2"
+          rows="4"
+          required
+        />
+        <div className="grid grid-cols-2 gap-4">
+          <input
+            type="number"
+            placeholder="Price"
+            value={course.price}
+            onChange={(e) => setCourse({ ...course, price: e.target.value })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            required
+          />
+          <input
+            type="text"
+            placeholder="Category"
+            value={course.category}
+            onChange={(e) => setCourse({ ...course, category: e.target.value })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            required
+          />
         </div>
-
-        <textarea name="description" value={course.description} onChange={handleChange} placeholder="Description" className="border w-full rounded px-3 py-2" rows={4} required />
 
         {/* Thumbnail */}
         <div>
-          <label className="font-medium">Thumbnail</label>
-          <input type="file" onChange={handleThumbnailChange} className="w-full mb-2" />
-          {course.thumbnail && <img src={course.thumbnail} alt="Thumbnail" className="w-40 h-28 object-cover border rounded" />}
+          <label className="block mb-2 font-medium">Course Thumbnail</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleThumbnailChange(e.target.files[0])}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-2"
+          />
+          {course.thumbnail && (
+            <img
+              src={course.thumbnail instanceof File ? URL.createObjectURL(course.thumbnail) : course.thumbnail}
+              alt="Thumbnail Preview"
+              className="mt-2 w-48 h-32 object-cover rounded-lg border"
+            />
+          )}
         </div>
 
         {/* Lessons */}
         <div>
-          <h2 className="text-xl font-bold mb-2">Lessons</h2>
-          {course.content.map((lesson, idx) => (
-            <div key={idx} className="border p-4 rounded mb-4">
-              <input type="text" value={lesson.title} onChange={(e) => handleLessonChange(idx, "title", e.target.value)} placeholder="Lesson title" className="w-full border rounded px-2 py-1 mb-2" />
-              <select value={lesson.type} onChange={(e) => handleLessonChange(idx, "type", e.target.value)} className="w-full border rounded px-2 py-1 mb-2">
+          <h2 className="text-xl font-semibold mb-3">Course Lessons</h2>
+          {course.content.map((lesson, index) => (
+            <div key={index} className="border border-gray-200 rounded-xl p-4 mb-4 relative">
+              <input
+                type="text"
+                placeholder="Lesson Title"
+                value={lesson.title}
+                onChange={(e) => handleLessonChange(index, "title", e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-2"
+                required
+              />
+              <select
+                value={lesson.type}
+                onChange={(e) => handleLessonChange(index, "type", e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 mb-2 w-full"
+              >
                 <option value="text">Text</option>
                 <option value="video">Video</option>
                 <option value="pdf">PDF</option>
               </select>
-              {(lesson.type === "video" || lesson.type === "pdf") && <input type="file" onChange={(e) => handleLessonFileChange(e, idx)} className="mb-2" />}
+
+              {lesson.type === "text" && (
+                <textarea
+                  placeholder="Lesson content"
+                  value={lesson.contentText}
+                  onChange={(e) => handleLessonChange(index, "contentText", e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-2"
+                  rows="4"
+                  required
+                />
+              )}
+
+              {(lesson.type === "video" || lesson.type === "pdf") && (
+                <>
+                  <input
+                    type="file"
+                    onChange={(e) => handleFileChange(index, e.target.files[0])}
+                    className="w-full mb-2"
+                  />
+                  {lesson.file && <p className="text-sm text-gray-600">Selected file: {lesson.file.name}</p>}
+                </>
+              )}
 
               {/* Quiz */}
-              <div className="mt-2">
-                {lesson.quiz.map((q, qIdx) => (
-                  <div key={qIdx} className="border p-2 mb-2 rounded">
-                    <input type="text" value={q.question} onChange={(e) => handleQuestionChange(idx, qIdx, "question", e.target.value)} placeholder="Question" className="w-full border rounded px-2 py-1 mb-1" />
-                    {q.options.map((opt, optIdx) => (
-                      <input key={optIdx} type="text" value={opt} onChange={(e) => handleOptionChange(idx, qIdx, optIdx, e.target.value)} placeholder={`Option ${optIdx + 1}`} className="w-full border rounded px-2 py-1 mb-1" />
+              <div className="mt-3">
+                <h3 className="font-semibold mb-2">Lesson Quiz</h3>
+                {lesson.quiz.map((q, qIndex) => (
+                  <div key={qIndex} className="border p-3 mb-2 rounded-lg">
+                    <input
+                      type="text"
+                      placeholder="Question"
+                      value={q.question}
+                      onChange={(e) => handleQuestionChange(index, qIndex, "question", e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-1"
+                      required
+                    />
+                    {q.options.map((opt, optIndex) => (
+                      <input
+                        key={optIndex}
+                        type="text"
+                        placeholder={`Option ${optIndex + 1}`}
+                        value={opt}
+                        onChange={(e) => handleOptionChange(index, qIndex, optIndex, e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-1"
+                        required
+                      />
                     ))}
-                    <select value={q.correctAnswer} onChange={(e) => handleCorrectAnswerChange(idx, qIdx, e.target.value)} className="w-full border rounded px-2 py-1 mb-1">
-                      {q.options.map((_, optIdx) => <option key={optIdx} value={optIdx}>Correct Answer: Option {optIdx + 1}</option>)}
+                    <select
+                      value={q.correctAnswer}
+                      onChange={(e) => handleCorrectAnswerChange(index, qIndex, e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-1"
+                    >
+                      {q.options.map((_, optIndex) => (
+                        <option key={optIndex} value={optIndex}>
+                          Correct Answer: Option {optIndex + 1}
+                        </option>
+                      ))}
                     </select>
+                    {lesson.quiz.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveQuestion(index, qIndex)}
+                        className="text-red-600 hover:text-red-800 mt-1"
+                      >
+                        Remove Question
+                      </button>
+                    )}
                   </div>
                 ))}
-                <button type="button" onClick={() => handleAddQuestion(idx)} className="bg-blue-500 text-white px-3 py-1 rounded mb-1">+ Add Question</button>
+                <button
+                  type="button"
+                  onClick={() => handleAddQuestion(index)}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg mb-2"
+                >
+                  + Add Question
+                </button>
               </div>
 
-              <button type="button" onClick={() => removeLesson(idx)} className="text-red-600 mt-2">Remove Lesson</button>
+              {course.content.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveLesson(index)}
+                  className="absolute top-2 right-2 text-red-600 hover:text-red-800 font-bold"
+                >
+                  Remove Lesson
+                </button>
+              )}
             </div>
           ))}
-          <button type="button" onClick={addLesson} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">+ Add Lesson</button>
+
+          <button
+            type="button"
+            onClick={handleAddLesson}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg mb-4"
+          >
+            + Add Lesson
+          </button>
         </div>
 
-        <button type="submit" className="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 mt-6">Update Course</button>
+        <button
+          type="submit"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg mt-4"
+          disabled={loading}
+        >
+          {loading ? "Updating..." : "Update Course"}
+        </button>
       </form>
     </div>
   );
