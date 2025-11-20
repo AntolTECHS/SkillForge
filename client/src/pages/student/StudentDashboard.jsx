@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../api/axios";
+import { useNavigate } from "react-router-dom";
 
 const StudentDashboard = () => {
-  const { user } = useAuth(); // user will be null if not logged in
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({ coursesCount: 0, xp: 0, badges: [] });
@@ -17,6 +20,11 @@ const StudentDashboard = () => {
   };
 
   const placeholderImage = "/images/course-placeholder.png";
+
+  const firstName = useMemo(
+    () => user?.name?.split?.(" ")?.[0] || "Learner",
+    [user]
+  );
 
   // Load Google Fonts
   useEffect(() => {
@@ -39,21 +47,17 @@ const StudentDashboard = () => {
     };
   }, []);
 
-  const firstName = useMemo(
-    () => user?.name?.split?.(" ")?.[0] || "Learner",
-    [user]
-  );
-
   // Fetch dashboard data only if user is logged in
   useEffect(() => {
-    if (!user) {
-      setLoading(false); // stop loading if not logged in
-      return;
-    }
-
     const fetchDashboard = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
+
       try {
         const [coursesRes, enrollRes, statsRes] = await Promise.all([
           axiosInstance.get("/courses/available"),
@@ -73,10 +77,7 @@ const StudentDashboard = () => {
         const enrolledMap = {};
         (enrollRes.data.enrollments || []).forEach((e) => {
           enrolledSet.add(e.course._id);
-          enrolledMap[e.course._id] = {
-            progress: e.progress || 0,
-            hasPaid: e.hasPaid,
-          };
+          enrolledMap[e.course._id] = { progress: e.progress || 0, hasPaid: e.hasPaid };
         });
         setEnrolledIds(enrolledSet);
 
@@ -86,7 +87,6 @@ const StudentDashboard = () => {
           progress: enrolledMap[c._id]?.progress || 0,
           hasPaid: enrolledMap[c._id]?.hasPaid || false,
         }));
-
         setCourses(allCourses);
       } catch (err) {
         console.error("Dashboard load error:", err);
@@ -100,40 +100,37 @@ const StudentDashboard = () => {
   }, [user]);
 
   const cacheBust = (url) => (url ? `${url}?v=${new Date().getTime()}` : "");
+
   const displayedCourses = showAll ? courses : courses.slice(0, 3);
 
-  // ------------------------------
-  // IF USER IS NOT LOGGED IN
-  // ------------------------------
+  // ==================== RENDER ====================
   if (!user) {
+    // Landing page for visitors
     return (
       <div
-        className="min-h-screen flex items-center justify-center px-4"
+        className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-400 via-sky-400 to-cyan-400 px-4 text-center"
         style={rootFontStyle}
       >
-        <div className="max-w-3xl w-full bg-gradient-to-r from-blue-400 via-sky-400 to-cyan-400 text-white rounded-3xl shadow-xl p-12 text-center">
-          <h1 className="text-3xl sm:text-5xl font-extrabold mb-6">
-            Welcome to Skill Forge!
-          </h1>
-          <p className="text-lg sm:text-xl mb-8">
-            Unlock your potential. Learn new skills, earn XP, and achieve badges!
-          </p>
-          <a
-            href="/register"
-            className="inline-block bg-white text-blue-600 font-semibold px-8 py-3 rounded-full text-lg hover:bg-gray-100 transition"
-          >
-            Get Started
-          </a>
-        </div>
+        <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4">
+          Welcome to SkillForge!
+        </h1>
+        <p className="text-white/90 max-w-xl mb-8 text-lg sm:text-xl">
+          Start your learning journey today — explore courses, earn XP, and unlock
+          badges as you master new skills.
+        </p>
+        <button
+          onClick={() => navigate("/register")}
+          className="bg-white text-blue-600 font-semibold px-6 py-3 rounded-full hover:bg-blue-50 transition"
+        >
+          Get Started
+        </button>
       </div>
     );
   }
 
-  // ------------------------------
-  // LOGGED IN DASHBOARD
-  // ------------------------------
+  // ==================== LOGGED IN DASHBOARD ====================
   return (
-    <div className="w-full" style={rootFontStyle}>
+    <div className="w-full p-6" style={rootFontStyle}>
       {/* HERO */}
       <div className="mb-6">
         <div
@@ -168,9 +165,7 @@ const StudentDashboard = () => {
             <p className="text-2xl sm:text-3xl font-bold text-sky-600">
               {stats.coursesCount}
             </p>
-            <p className="text-xs text-gray-400 mt-1 sm:mt-2">
-              Keep up the good work!
-            </p>
+            <p className="text-xs text-gray-400 mt-1 sm:mt-2">Keep up the good work!</p>
           </div>
 
           <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition">
@@ -184,17 +179,13 @@ const StudentDashboard = () => {
           </div>
 
           <div
-            className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition 
-              col-span-2 sm:col-span-2 md:col-span-1 
-              text-center md:text-left"
+            className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition col-span-2 sm:col-span-2 md:col-span-1 text-center md:text-left"
           >
             <h3 className="text-sm text-gray-500 mb-2">Badges Earned</h3>
             <p className="text-2xl sm:text-3xl font-bold text-sky-600">
               {stats.badges?.length ?? 0}
             </p>
-            <p className="text-xs text-gray-400 mt-1 sm:mt-2">
-              Milestones unlocked
-            </p>
+            <p className="text-xs text-gray-400 mt-1 sm:mt-2">Milestones unlocked</p>
           </div>
         </div>
       )}
@@ -207,9 +198,7 @@ const StudentDashboard = () => {
           </h2>
 
           {courses.length === 0 ? (
-            <p className="text-gray-500 italic">
-              No courses available at the moment.
-            </p>
+            <p className="text-gray-500 italic">No courses available at the moment.</p>
           ) : (
             <>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -241,9 +230,7 @@ const StudentDashboard = () => {
                         />
                       </div>
 
-                      <p className="text-xs text-gray-500">
-                        {course.progress}% completed
-                      </p>
+                      <p className="text-xs text-gray-500">{course.progress}% completed</p>
                     </div>
                   </div>
                 ))}

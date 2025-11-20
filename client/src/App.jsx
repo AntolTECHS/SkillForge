@@ -1,10 +1,10 @@
 import React from "react";
 import {
-BrowserRouter as Router,
-Routes,
-Route,
-Navigate,
-useLocation,
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SidebarProvider } from "./context/SidebarContext";
@@ -40,124 +40,119 @@ import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminCourses from "./pages/Admin/courses";
 import AdminInstructors from "./pages/Admin/instructors";
 
-
 // ============================================================
 // Layout Wrapper
 // ============================================================
 function AppLayout() {
-const location = useLocation();
-const { isAuthenticated, user } = useAuth();
+  const location = useLocation();
+  const { isAuthenticated, user } = useAuth();
 
-// Hide Navbar on internal dashboards
-const hideNavbar =
-location.pathname.startsWith("/admin") ||
-location.pathname.startsWith("/student") ||
-location.pathname.startsWith("/instructor");
+  // Hide Navbar on internal dashboards
+  const hideNavbar =
+    location.pathname.startsWith("/admin") ||
+    location.pathname.startsWith("/student") ||
+    location.pathname.startsWith("/instructor");
 
-// Determine default redirect after login
-const defaultRedirect =
-user?.role === "instructor"
-? "/instructor/dashboard"
-: user?.role === "admin"
-? "/admin"
-: "/student/dashboard";
+  // Determine default redirect after login
+  const defaultRedirect =
+    user?.role === "instructor"
+      ? "/instructor/dashboard"
+      : user?.role === "admin"
+      ? "/admin"
+      : "/student/dashboard";
 
-return ( <div className="min-h-screen bg-gray-50">
-{!hideNavbar && <Navbar />}
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {!hideNavbar && <Navbar />}
 
-```
-  <Routes>
-    {/* ==================== DEFAULT REDIRECT ==================== */}
-    <Route
-      path="/"
-      element={
-        isAuthenticated ? (
-          <Navigate to={defaultRedirect} replace />
-        ) : (
-          <Navigate to="/login" replace />
-        )
-      }
-    />
+      <Routes>
+        {/* ==================== LANDING PAGE ==================== */}
+        <Route path="/" element={<StudentDashboard />} />
 
-    {/* ==================== PUBLIC ROUTES ==================== */}
-    <Route path="/login" element={<Login />} />
-    <Route path="/register" element={<Register />} />
+        {/* ==================== PUBLIC ROUTES ==================== */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-    {/* ==================== STUDENT ROUTES ==================== */}
-    <Route
-      path="/student/*"
-      element={
-        <ProtectedRoute allowedRoles={["student"]}>
-          <StudentLayout />
-        </ProtectedRoute>
-      }
-    >
-      <Route index element={<StudentDashboard />} />
-      <Route path="dashboard" element={<StudentDashboard />} />
-      <Route path="courses" element={<StudentCourses />} />
-      <Route path="chat" element={<StudentChat />} />
-      <Route path="settings" element={<StudentSettings />} />
-      <Route path="rewards" element={<StudentRewards />} />
-      <Route path="community" element={<CommunityPage />} />
-    </Route>
+        {/* ==================== STUDENT ROUTES ==================== */}
+        <Route
+          path="/student/*"
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <StudentLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<StudentDashboard />} />
+          <Route path="dashboard" element={<StudentDashboard />} />
+          <Route path="courses" element={<StudentCourses />} />
+          <Route path="chat" element={<StudentChat />} />
+          <Route path="settings" element={<StudentSettings />} />
+          <Route path="rewards" element={<StudentRewards />} />
+          <Route path="community" element={<CommunityPage />} />
+        </Route>
 
-    {/* ==================== INSTRUCTOR ROUTES ==================== */}
-    <Route
-      path="/instructor/*"
-      element={
-        <ProtectedRoute instructorOnly>
-          <InstructorLayout />
-        </ProtectedRoute>
-      }
-    >
-      <Route path="dashboard" element={<InstructorDashboard />} />
-      <Route path="my-courses" element={<MyCourses />} />
-      <Route path="create-course" element={<CreateCourse />} />
-      <Route path="course/edit/:courseId" element={<EditCourse />} />
-      <Route path="students" element={<Students />} />
-      <Route path="settings" element={<InstructorSettings />} />
-      <Route path="change-password" element={<ChangePassword />} />
-    </Route>
+        {/* ==================== INSTRUCTOR ROUTES ==================== */}
+        <Route
+          path="/instructor/*"
+          element={
+            <ProtectedRoute instructorOnly>
+              <InstructorLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="dashboard" element={<InstructorDashboard />} />
+          <Route path="my-courses" element={<MyCourses />} />
+          <Route path="create-course" element={<CreateCourse />} />
+          <Route path="course/edit/:courseId" element={<EditCourse />} />
+          <Route path="students" element={<Students />} />
+          <Route path="settings" element={<InstructorSettings />} />
+          <Route path="change-password" element={<ChangePassword />} />
+        </Route>
 
-    {/* ==================== ADMIN ROUTES ==================== */}
-    <Route
-      path="/admin/*"
-      element={
-        <ProtectedRoute adminOnly>
-          <AdminDashboard />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/admin/courses"
-      element={
-        <ProtectedRoute adminOnly>
-          <AdminCourses />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/admin/instructors"
-      element={
-        <ProtectedRoute adminOnly>
-          <AdminInstructors />
-        </ProtectedRoute>
-      }
-    />
+        {/* ==================== ADMIN ROUTES ==================== */}
+        <Route
+          path="/admin/*"
+          element={
+            <ProtectedRoute adminOnly>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/courses"
+          element={
+            <ProtectedRoute adminOnly>
+              <AdminCourses />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/instructors"
+          element={
+            <ProtectedRoute adminOnly>
+              <AdminInstructors />
+            </ProtectedRoute>
+          }
+        />
 
-
-    {/* ==================== FALLBACK ROUTE ==================== */}
-    <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes>
-</div>
-
-);
+        {/* ==================== FALLBACK ROUTE ==================== */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </div>
+  );
 }
 
 // ============================================================
 // App Root Wrapper
 // ============================================================
 export default function App() {
-return ( <Router> <AuthProvider> <SidebarProvider> <AppLayout /> </SidebarProvider> </AuthProvider> </Router>
-);
+  return (
+    <Router>
+      <AuthProvider>
+        <SidebarProvider>
+          <AppLayout />
+        </SidebarProvider>
+      </AuthProvider>
+    </Router>
+  );
 }
