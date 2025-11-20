@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Send } from "lucide-react";
-import axios from "axios";
+import axiosInstance from "../../api/axios"; // ✅ Use central axios
 import Sidebar from "../../components/Sidebar";
 
 export default function StudentChat() {
@@ -9,21 +9,11 @@ export default function StudentChat() {
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef(null);
 
-  const BACKEND_CHAT_URL = "http://localhost:5000/api/skillforge/chat";
-  const BACKEND_HISTORY_URL = "http://localhost:5000/api/skillforge/history";
-
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("token");
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  };
-
   // Fetch chat history
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await axios.get(BACKEND_HISTORY_URL, {
-          headers: getAuthHeaders(),
-        });
+        const res = await axiosInstance.get("/skillforge/history");
 
         if (!res.data.messages || res.data.messages.length === 0) {
           setMessages([
@@ -31,7 +21,7 @@ export default function StudentChat() {
               id: "welcome",
               from: "ai",
               text:
-                "Hello there! I'm your AI learning assistant from SmartLearn. How can I help you today?",
+                "Hello there! I'm your AI learning assistant from SkillForge. How can I help you today?",
             },
           ]);
         } else {
@@ -67,11 +57,9 @@ export default function StudentChat() {
     setLoading(true);
 
     try {
-      const res = await axios.post(
-        BACKEND_CHAT_URL,
-        { message: userMsg.text },
-        { headers: getAuthHeaders() }
-      );
+      const res = await axiosInstance.post("/skillforge/chat", {
+        message: userMsg.text,
+      });
 
       const aiText =
         res.data.reply || "Sorry, I couldn’t generate a response right now.";
@@ -102,7 +90,6 @@ export default function StudentChat() {
 
       {/* CHAT SECTION */}
       <div className="flex-1 flex flex-col relative lg:ml-64">
-        {/* CHAT CONTENT */}
         <main className="flex-1 overflow-y-auto w-full">
           <div className="flex flex-col gap-4 w-full">
             {messages.map((msg) => (
