@@ -3,6 +3,8 @@ import { Bell, Moon } from "lucide-react";
 import axios from "axios";
 
 const Settings = () => {
+  const API_URL = import.meta.env.VITE_API_URL || "https://skillforge-75b5.onrender.com";
+
   const [profile, setProfile] = useState({
     name: "",
     email: "",
@@ -20,40 +22,45 @@ const Settings = () => {
   // Fetch profile on mount
   useEffect(() => {
     const fetchProfile = async () => {
+      setLoading(true);
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.get("http://localhost:5000/api/instructor/profile", {
+        if (!token) throw new Error("User not authenticated");
+
+        const res = await axios.get(`${API_URL}/api/instructor/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+
         if (res.data.success) {
           setProfile(res.data.profile);
         }
       } catch (err) {
-        console.error("Failed to fetch profile:", err);
-        alert("Failed to load profile data.");
+        console.error("Failed to fetch profile:", err?.response?.data || err.message);
+        alert("Failed to load profile data. Check console for details.");
       } finally {
         setLoading(false);
       }
     };
     fetchProfile();
-  }, []);
+  }, [API_URL]);
 
   // Update profile
   const handleSave = async () => {
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.put(
-        "http://localhost:5000/api/instructor/profile",
-        profile,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      if (!token) throw new Error("User not authenticated");
+
+      const res = await axios.put(`${API_URL}/api/instructor/profile`, profile, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
       if (res.data.success) {
         alert("Profile updated successfully!");
       }
     } catch (err) {
-      console.error("Failed to update profile:", err);
-      alert("Failed to save profile changes.");
+      console.error("Failed to update profile:", err?.response?.data || err.message);
+      alert("Failed to save profile changes. Check console for details.");
     } finally {
       setSaving(false);
     }
