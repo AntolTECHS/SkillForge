@@ -30,9 +30,17 @@ const app = express();
 connectDB();
 
 // ✅ CORS setup
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(origin => origin.trim());
+
 app.use(
   cors({
-    origin: "http://localhost:5173", // React frontend
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); // allow non-browser requests
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS policy: Access denied from ${origin}`));
+    },
     credentials: true,
   })
 );
@@ -66,7 +74,7 @@ app.post("/api/uploads", upload.single("file"), (req, res) => {
 
 // ✅ Health check
 app.get("/", (req, res) => {
-  res.send("🚀 LearnSphere API is running...");
+  res.send("🚀 SkillForge API is running...");
 });
 
 // ✅ Register API Routes
