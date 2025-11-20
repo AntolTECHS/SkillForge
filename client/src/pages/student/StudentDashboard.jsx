@@ -100,38 +100,12 @@ const StudentDashboard = () => {
   }, [user]);
 
   const cacheBust = (url) => (url ? `${url}?v=${new Date().getTime()}` : "");
-
   const displayedCourses = showAll ? courses : courses.slice(0, 3);
 
   // ==================== RENDER ====================
-  if (!user) {
-    // Landing page for visitors
-    return (
-      <div
-        className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-400 via-sky-400 to-cyan-400 px-4 text-center"
-        style={rootFontStyle}
-      >
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4">
-          Welcome to SkillForge!
-        </h1>
-        <p className="text-white/90 max-w-xl mb-8 text-lg sm:text-xl">
-          Start your learning journey today — explore courses, earn XP, and unlock
-          badges as you master new skills.
-        </p>
-        <button
-          onClick={() => navigate("/register")}
-          className="bg-white text-blue-600 font-semibold px-6 py-3 rounded-full hover:bg-blue-50 transition"
-        >
-          Get Started
-        </button>
-      </div>
-    );
-  }
-
-  // ==================== LOGGED IN DASHBOARD ====================
   return (
     <div className="w-full p-6" style={rootFontStyle}>
-      {/* HERO */}
+      {/* HERO / Welcome rectangle */}
       <div className="mb-6">
         <div
           className="
@@ -139,15 +113,36 @@ const StudentDashboard = () => {
             text-white shadow-md overflow-hidden rounded-3xl
             p-8 sm:p-10 lg:p-12
             min-h-[180px] sm:min-h-[220px]
+            flex flex-col justify-center items-center text-center
           "
         >
-          <h1 className="text-2xl sm:text-4xl font-extrabold mb-3">
-            Welcome back, {firstName}!
-          </h1>
-          <p className="text-white/95 max-w-full text-sm sm:text-base leading-relaxed">
-            Continue your learning journey — complete lessons, earn XP, track your
-            progress, and unlock badges as you master new skills.
-          </p>
+          {!user ? (
+            <>
+              <h1 className="text-4xl sm:text-5xl font-extrabold mb-4">
+                Welcome to SkillForge!
+              </h1>
+              <p className="text-white/90 max-w-xl mb-6 text-lg sm:text-xl">
+                Start your learning journey today — explore courses, earn XP, and
+                unlock badges as you master new skills.
+              </p>
+              <button
+                onClick={() => navigate("/register")}
+                className="bg-white text-blue-600 font-semibold px-6 py-3 rounded-full hover:bg-blue-50 transition"
+              >
+                Get Started
+              </button>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl sm:text-4xl font-extrabold mb-3">
+                Welcome back, {firstName}!
+              </h1>
+              <p className="text-white/95 max-w-full text-sm sm:text-base leading-relaxed">
+                Continue your learning journey — complete lessons, earn XP, track your
+                progress, and unlock badges as you master new skills.
+              </p>
+            </>
+          )}
         </div>
       </div>
 
@@ -157,98 +152,99 @@ const StudentDashboard = () => {
       {/* LOADING */}
       {loading && <div className="mb-6 text-gray-500">Loading dashboard...</div>}
 
-      {/* STATS */}
-      {!loading && !error && (
-        <div className="mb-12 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-          <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition">
-            <h3 className="text-sm text-gray-500 mb-2">Courses Enrolled</h3>
-            <p className="text-2xl sm:text-3xl font-bold text-sky-600">
-              {stats.coursesCount}
-            </p>
-            <p className="text-xs text-gray-400 mt-1 sm:mt-2">Keep up the good work!</p>
+      {/* Only show stats and courses if user is logged in */}
+      {user && !loading && !error && (
+        <>
+          {/* STATS */}
+          <div className="mb-12 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+            <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition">
+              <h3 className="text-sm text-gray-500 mb-2">Courses Enrolled</h3>
+              <p className="text-2xl sm:text-3xl font-bold text-sky-600">
+                {stats.coursesCount}
+              </p>
+              <p className="text-xs text-gray-400 mt-1 sm:mt-2">Keep up the good work!</p>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition">
+              <h3 className="text-sm text-gray-500 mb-2">XP Earned</h3>
+              <p className="text-2xl sm:text-3xl font-bold text-cyan-600">
+                {stats.xp?.toLocaleString() ?? 0}
+              </p>
+              <p className="text-xs text-gray-400 mt-1 sm:mt-2">
+                Gain more XP by finishing lessons
+              </p>
+            </div>
+
+            <div
+              className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition col-span-2 sm:col-span-2 md:col-span-1 text-center md:text-left"
+            >
+              <h3 className="text-sm text-gray-500 mb-2">Badges Earned</h3>
+              <p className="text-2xl sm:text-3xl font-bold text-sky-600">
+                {stats.badges?.length ?? 0}
+              </p>
+              <p className="text-xs text-gray-400 mt-1 sm:mt-2">Milestones unlocked</p>
+            </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition">
-            <h3 className="text-sm text-gray-500 mb-2">XP Earned</h3>
-            <p className="text-2xl sm:text-3xl font-bold text-cyan-600">
-              {stats.xp?.toLocaleString() ?? 0}
-            </p>
-            <p className="text-xs text-gray-400 mt-1 sm:mt-2">
-              Gain more XP by finishing lessons
-            </p>
-          </div>
+          {/* CURRENT COURSES */}
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">
+              Current Courses
+            </h2>
 
-          <div
-            className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition col-span-2 sm:col-span-2 md:col-span-1 text-center md:text-left"
-          >
-            <h3 className="text-sm text-gray-500 mb-2">Badges Earned</h3>
-            <p className="text-2xl sm:text-3xl font-bold text-sky-600">
-              {stats.badges?.length ?? 0}
-            </p>
-            <p className="text-xs text-gray-400 mt-1 sm:mt-2">Milestones unlocked</p>
-          </div>
-        </div>
-      )}
-
-      {/* CURRENT COURSES */}
-      {!loading && !error && (
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">
-            Current Courses
-          </h2>
-
-          {courses.length === 0 ? (
-            <p className="text-gray-500 italic">No courses available at the moment.</p>
-          ) : (
-            <>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {displayedCourses.map((course) => (
-                  <div
-                    key={course._id}
-                    className="bg-white rounded-2xl shadow border border-blue-100 overflow-hidden hover:shadow-lg transition cursor-pointer"
-                  >
-                    <div className="h-28 sm:h-32 w-full overflow-hidden rounded-t-2xl bg-gray-100">
-                      <img
-                        src={cacheBust(course.image) || placeholderImage}
-                        alt={course.title || "Course Image"}
-                        className="w-full h-full object-cover object-center"
-                      />
-                    </div>
-
-                    <div className="p-4 flex flex-col" style={{ minHeight: "8rem" }}>
-                      <h3 className="text-sm sm:text-base font-semibold mb-1 text-gray-800">
-                        {course.title}
-                      </h3>
-                      <p className="text-xs text-gray-500 mb-2">
-                        Instructor: {course.instructor?.name || "TBA"}
-                      </p>
-
-                      <div className="w-full bg-blue-100 rounded-full h-2 mb-2">
-                        <div
-                          className="bg-sky-500 h-2 rounded-full transition-all"
-                          style={{ width: `${course.progress}%` }}
+            {courses.length === 0 ? (
+              <p className="text-gray-500 italic">No courses available at the moment.</p>
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {displayedCourses.map((course) => (
+                    <div
+                      key={course._id}
+                      className="bg-white rounded-2xl shadow border border-blue-100 overflow-hidden hover:shadow-lg transition cursor-pointer"
+                    >
+                      <div className="h-28 sm:h-32 w-full overflow-hidden rounded-t-2xl bg-gray-100">
+                        <img
+                          src={cacheBust(course.image) || placeholderImage}
+                          alt={course.title || "Course Image"}
+                          className="w-full h-full object-cover object-center"
                         />
                       </div>
 
-                      <p className="text-xs text-gray-500">{course.progress}% completed</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                      <div className="p-4 flex flex-col" style={{ minHeight: "8rem" }}>
+                        <h3 className="text-sm sm:text-base font-semibold mb-1 text-gray-800">
+                          {course.title}
+                        </h3>
+                        <p className="text-xs text-gray-500 mb-2">
+                          Instructor: {course.instructor?.name || "TBA"}
+                        </p>
 
-              {courses.length > 3 && !showAll && (
-                <div className="mt-4 flex justify-center">
-                  <button
-                    onClick={() => setShowAll(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-semibold transition"
-                  >
-                    View All Courses
-                  </button>
+                        <div className="w-full bg-blue-100 rounded-full h-2 mb-2">
+                          <div
+                            className="bg-sky-500 h-2 rounded-full transition-all"
+                            style={{ width: `${course.progress}%` }}
+                          />
+                        </div>
+
+                        <p className="text-xs text-gray-500">{course.progress}% completed</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </>
-          )}
-        </div>
+
+                {courses.length > 3 && !showAll && (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      onClick={() => setShowAll(true)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-semibold transition"
+                    >
+                      View All Courses
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
