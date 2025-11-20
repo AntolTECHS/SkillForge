@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import axiosInstance from "../../api/axios"; // ✅ Use centralized axios
 import { useAuth } from "../../context/AuthContext";
 
 const StudentDashboard = () => {
@@ -21,8 +21,8 @@ const StudentDashboard = () => {
   };
 
   const placeholderImage = "/images/course-placeholder.png";
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+  // Load Google Fonts
   useEffect(() => {
     if (!document.getElementById("gf-poppins")) {
       const link = document.createElement("link");
@@ -34,6 +34,7 @@ const StudentDashboard = () => {
     }
   }, []);
 
+  // Body background color
   useEffect(() => {
     const prev = document.body.style.backgroundColor;
     document.body.style.backgroundColor = "#eff6ff";
@@ -47,29 +48,26 @@ const StudentDashboard = () => {
     [user]
   );
 
+  // Fetch dashboard data
   useEffect(() => {
     const fetchDashboard = async () => {
       setLoading(true);
       setError(null);
       try {
-        const token = localStorage.getItem("token");
-
         const [coursesRes, enrollRes, statsRes] = await Promise.all([
-          axios.get(`${API_URL}/api/courses/available`),
-          axios.get(`${API_URL}/api/enrollments`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          axios.get("/api/student/dashboard", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
+          axiosInstance.get("/courses/available"),
+          axiosInstance.get("/enrollments"),
+          axiosInstance.get("/student/dashboard"),
         ]);
 
+        // Stats
         setStats({
           xp: statsRes.data.stats?.xp || 0,
           badges: statsRes.data.stats?.badges || [],
           coursesCount: (enrollRes.data.enrollments || []).length,
         });
 
+        // Enrolled courses mapping
         const enrolledSet = new Set();
         const enrolledMap = {};
         (enrollRes.data.enrollments || []).forEach((e) => {
@@ -81,6 +79,7 @@ const StudentDashboard = () => {
         });
         setEnrolledIds(enrolledSet);
 
+        // Merge course data with enrollment info
         const allCourses = (coursesRes.data.courses || []).map((c) => ({
           ...c,
           progress: enrolledMap[c._id]?.progress || 0,
@@ -96,7 +95,7 @@ const StudentDashboard = () => {
       }
     };
 
-    fetchDashboard();
+    if (user) fetchDashboard();
   }, [user]);
 
   const cacheBust = (url) => (url ? `${url}?v=${new Date().getTime()}` : "");
@@ -118,7 +117,6 @@ const StudentDashboard = () => {
           <h1 className="text-2xl sm:text-4xl font-extrabold mb-3">
             Welcome back, {firstName}!
           </h1>
-
           <p className="text-white/95 max-w-full text-sm sm:text-base leading-relaxed">
             Continue your learning journey — complete lessons, earn XP, track your
             progress, and unlock badges as you master new skills.
@@ -135,7 +133,6 @@ const StudentDashboard = () => {
       {/* STATS */}
       {!loading && !error && (
         <div className="mb-12 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-          {/* Card 1 */}
           <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition">
             <h3 className="text-sm text-gray-500 mb-2">Courses Enrolled</h3>
             <p className="text-2xl sm:text-3xl font-bold text-sky-600">
@@ -146,7 +143,6 @@ const StudentDashboard = () => {
             </p>
           </div>
 
-          {/* Card 2 */}
           <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition">
             <h3 className="text-sm text-gray-500 mb-2">XP Earned</h3>
             <p className="text-2xl sm:text-3xl font-bold text-cyan-600">
@@ -157,10 +153,10 @@ const StudentDashboard = () => {
             </p>
           </div>
 
-          {/* Card 3 */}
-          <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition 
-            col-span-2 sm:col-span-2 md:col-span-1 
-            text-center md:text-left"
+          <div
+            className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition 
+              col-span-2 sm:col-span-2 md:col-span-1 
+              text-center md:text-left"
           >
             <h3 className="text-sm text-gray-500 mb-2">Badges Earned</h3>
             <p className="text-2xl sm:text-3xl font-bold text-sky-600">
@@ -223,7 +219,6 @@ const StudentDashboard = () => {
                 ))}
               </div>
 
-              {/* VIEW ALL BUTTON */}
               {courses.length > 3 && !showAll && (
                 <div className="mt-4 flex justify-center">
                   <button
