@@ -3,6 +3,8 @@ import { User } from "lucide-react";
 import axios from "axios";
 
 const Students = () => {
+  const API_URL = import.meta.env.VITE_API_URL || "https://skillforge-75b5.onrender.com";
+
   const [studentsByCourse, setStudentsByCourse] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -13,23 +15,26 @@ const Students = () => {
 
   useEffect(() => {
     const fetchStudents = async () => {
+      setLoading(true);
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.get("http://localhost:5000/api/instructor/students", {
+        if (!token) throw new Error("User not authenticated");
+
+        const res = await axios.get(`${API_URL}/api/instructor/students`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
         if (res.data.success) {
-          // Group students by course
           const grouped = {};
           res.data.students.forEach((student) => {
-            if (!grouped[student.course]) grouped[student.course] = [];
-            grouped[student.course].push(student);
+            const course = student.course || "Unknown Course";
+            if (!grouped[course]) grouped[course] = [];
+            grouped[course].push(student);
           });
           setStudentsByCourse(grouped);
         }
       } catch (err) {
-        console.error("Failed to fetch students:", err);
+        console.error("Failed to fetch students:", err?.response?.data || err.message);
         alert("Failed to fetch students. Check console for details.");
       } finally {
         setLoading(false);
@@ -37,7 +42,7 @@ const Students = () => {
     };
 
     fetchStudents();
-  }, []);
+  }, [API_URL]);
 
   if (loading)
     return (
@@ -57,7 +62,6 @@ const Students = () => {
           <div key={courseTitle} className="mb-8">
             <h2 className="text-2xl font-semibold mb-4">{courseTitle}</h2>
 
-            {/* Responsive wrapper for horizontal scrolling on small screens */}
             <div className="bg-white shadow rounded-xl overflow-x-auto">
               <div className="min-w-[600px]">
                 <table className="w-full border-collapse text-gray-700" style={pageFont}>
