@@ -3,12 +3,15 @@ import { BookOpen, Users, Clock } from "lucide-react";
 import axios from "axios";
 
 const InstructorDashboard = () => {
+  const API_URL = import.meta.env.VITE_API_URL || "https://skillforge-75b5.onrender.com";
+
   const [stats, setStats] = useState({
     courses: 0,
     students: 0,
     pendingReviews: 0,
   });
   const [activeCourses, setActiveCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const pageFont = {
     fontFamily:
@@ -18,20 +21,17 @@ const InstructorDashboard = () => {
   // Fetch dashboard data
   useEffect(() => {
     const fetchDashboardData = async () => {
+      setLoading(true);
       try {
         const token = localStorage.getItem("token");
+        if (!token) throw new Error("User not authenticated");
 
-        const coursesRes = await axios.get(
-          "http://localhost:5000/api/instructor/my-courses",
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const coursesRes = await axios.get(`${API_URL}/api/instructor/my-courses`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
         const courses = coursesRes.data.courses || [];
-
-        const totalStudents = courses.reduce(
-          (acc, c) => acc + (c.studentsCount || 0),
-          0
-        );
-
+        const totalStudents = courses.reduce((acc, c) => acc + (c.studentsCount || 0), 0);
         const pendingReviews = courses.filter((c) => !c.isPublished).length;
 
         setStats({
@@ -42,33 +42,23 @@ const InstructorDashboard = () => {
 
         setActiveCourses(courses);
       } catch (err) {
-        console.error("Failed to fetch dashboard data", err);
+        console.error("Failed to fetch dashboard data", err?.response?.data || err.message);
+        alert("Failed to load dashboard data.");
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchDashboardData();
-  }, []);
+  }, [API_URL]);
 
   const statCards = [
-    {
-      icon: BookOpen,
-      label: "Courses",
-      value: stats.courses,
-      color: "bg-blue-100 text-blue-700",
-    },
-    {
-      icon: Users,
-      label: "Students",
-      value: stats.students,
-      color: "bg-green-100 text-green-700",
-    },
-    {
-      icon: Clock,
-      label: "Pending Reviews",
-      value: stats.pendingReviews,
-      color: "bg-red-100 text-red-700",
-    },
+    { icon: BookOpen, label: "Courses", value: stats.courses, color: "bg-blue-100 text-blue-700" },
+    { icon: Users, label: "Students", value: stats.students, color: "bg-green-100 text-green-700" },
+    { icon: Clock, label: "Pending Reviews", value: stats.pendingReviews, color: "bg-red-100 text-red-700" },
   ];
+
+  if (loading) return <div className="p-6 text-xl font-semibold">Loading dashboard...</div>;
 
   return (
     <div className="p-6" style={pageFont}>
@@ -87,11 +77,7 @@ const InstructorDashboard = () => {
               <p className="text-sm text-gray-500">{label}</p>
               <h2 className="text-2xl font-bold mt-1">{value}</h2>
             </div>
-
-            {/* Icon Wrapper — improved sizing */}
-            <div
-              className={`p-3 sm:p-4 rounded-full ${color} flex items-center justify-center`}
-            >
+            <div className={`p-3 sm:p-4 rounded-full ${color} flex items-center justify-center`}>
               <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </div>
@@ -116,18 +102,13 @@ const InstructorDashboard = () => {
                 </thead>
                 <tbody>
                   {activeCourses.map((course) => (
-                    <tr
-                      key={course._id}
-                      className="border-b hover:bg-gray-50 transition-colors"
-                    >
+                    <tr key={course._id} className="border-b hover:bg-gray-50 transition-colors">
                       <td className="py-3 px-4 font-medium">{course.title}</td>
                       <td className="py-3 px-4">{course.studentsCount || 0}</td>
                       <td className="py-3 px-4">
                         <span
                           className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                            course.isPublished
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
+                            course.isPublished ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
                           }`}
                         >
                           {course.isPublished ? "Published" : "Draft"}
@@ -145,18 +126,17 @@ const InstructorDashboard = () => {
       {/* Recent Activity */}
       <div className="bg-white shadow-lg rounded-2xl p-6">
         <h2 className="text-xl font-bold mb-5">Recent Activity</h2>
-        <div className="overflow-x-auto">
-          <div className="min-w-[400px]">
-            <ul className="space-y-3 text-gray-700">
-              {activeCourses.slice(-3).map((course, idx) => (
-                <li key={idx}>
-                  {course.isPublished ? "✅ Published" : "✏️ Updated"}{" "}
-                  <b>{course.title}</b>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+        {activeCourses.length === 0 ? (
+          <p className="text-gray-600">No recent activity.</p>
+        ) : (
+          <ul className="space-y-3 text-gray-700">
+            {activeCourses.slice(-3).map((course, idx) => (
+              <li key={idx}>
+                {course.isPublished ? "✅ Published" : "✏️ Updated"} <b>{course.title}</b>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
