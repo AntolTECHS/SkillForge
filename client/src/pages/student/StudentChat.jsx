@@ -103,8 +103,8 @@ export default function StudentChat() {
       {/* CHAT SECTION */}
       <div className="flex-1 flex flex-col relative lg:ml-64">
         {/* CHAT CONTENT */}
-        <main className="flex-1 overflow-y-auto w-full py-6">
-          <div className="flex flex-col gap-4 w-full px-4 sm:px-6 lg:px-0">
+        <main className="flex-1 overflow-y-auto w-full">
+          <div className="flex flex-col gap-4 w-full">
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -136,7 +136,7 @@ export default function StudentChat() {
         </main>
 
         {/* INPUT BAR */}
-        <div className="sticky bottom-0 flex justify-start py-4 border-t border-gray-300 px-4 sm:px-6 lg:px-0 bg-inherit">
+        <div className="sticky bottom-0 flex justify-start border-t border-gray-300 bg-inherit">
           <div className="flex items-center bg-white rounded-2xl border border-gray-300 shadow-md overflow-hidden w-full max-w-7xl mx-auto">
             <input
               type="text"

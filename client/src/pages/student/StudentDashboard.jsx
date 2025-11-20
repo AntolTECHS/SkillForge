@@ -74,7 +74,10 @@ const StudentDashboard = () => {
         const enrolledMap = {};
         (enrollRes.data.enrollments || []).forEach((e) => {
           enrolledSet.add(e.course._id);
-          enrolledMap[e.course._id] = { progress: e.progress || 0, hasPaid: e.hasPaid };
+          enrolledMap[e.course._id] = {
+            progress: e.progress || 0,
+            hasPaid: e.hasPaid,
+          };
         });
         setEnrolledIds(enrolledSet);
 
@@ -101,13 +104,21 @@ const StudentDashboard = () => {
   const displayedCourses = showAll ? courses : courses.slice(0, 3);
 
   return (
-    <div className="min-h-screen w-full p-4 sm:p-6" style={rootFontStyle}>
+    <div className="w-full" style={rootFontStyle}>
       {/* HERO */}
       <div className="mb-6">
-        <div className="bg-gradient-to-r from-blue-400 via-sky-400 to-cyan-400 text-white shadow-md overflow-hidden rounded-3xl p-6 sm:p-8">
-          <h1 className="text-2xl sm:text-4xl font-extrabold mb-2">
+        <div
+          className="
+            bg-gradient-to-r from-blue-400 via-sky-400 to-cyan-400
+            text-white shadow-md overflow-hidden rounded-3xl
+            p-8 sm:p-10 lg:p-12
+            min-h-[180px] sm:min-h-[220px]
+          "
+        >
+          <h1 className="text-2xl sm:text-4xl font-extrabold mb-3">
             Welcome back, {firstName}!
           </h1>
+
           <p className="text-white/95 max-w-full text-sm sm:text-base leading-relaxed">
             Continue your learning journey — complete lessons, earn XP, track your
             progress, and unlock badges as you master new skills.
@@ -124,14 +135,18 @@ const StudentDashboard = () => {
       {/* STATS */}
       {!loading && !error && (
         <div className="mb-12 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+          {/* Card 1 */}
           <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition">
             <h3 className="text-sm text-gray-500 mb-2">Courses Enrolled</h3>
             <p className="text-2xl sm:text-3xl font-bold text-sky-600">
               {stats.coursesCount}
             </p>
-            <p className="text-xs text-gray-400 mt-1 sm:mt-2">Keep up the good work!</p>
+            <p className="text-xs text-gray-400 mt-1 sm:mt-2">
+              Keep up the good work!
+            </p>
           </div>
 
+          {/* Card 2 */}
           <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition">
             <h3 className="text-sm text-gray-500 mb-2">XP Earned</h3>
             <p className="text-2xl sm:text-3xl font-bold text-cyan-600">
@@ -142,13 +157,18 @@ const StudentDashboard = () => {
             </p>
           </div>
 
-          {/* 3rd card: center on small screens */}
-          <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition col-span-2 sm:col-span-2 md:col-span-1 text-center md:text-left">
+          {/* Card 3 */}
+          <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition 
+            col-span-2 sm:col-span-2 md:col-span-1 
+            text-center md:text-left"
+          >
             <h3 className="text-sm text-gray-500 mb-2">Badges Earned</h3>
             <p className="text-2xl sm:text-3xl font-bold text-sky-600">
               {stats.badges?.length ?? 0}
             </p>
-            <p className="text-xs text-gray-400 mt-1 sm:mt-2">Milestones unlocked</p>
+            <p className="text-xs text-gray-400 mt-1 sm:mt-2">
+              Milestones unlocked
+            </p>
           </div>
         </div>
       )}
@@ -159,6 +179,7 @@ const StudentDashboard = () => {
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">
             Current Courses
           </h2>
+
           {courses.length === 0 ? (
             <p className="text-gray-500 italic">
               No courses available at the moment.
@@ -178,6 +199,7 @@ const StudentDashboard = () => {
                         className="w-full h-full object-cover object-center"
                       />
                     </div>
+
                     <div className="p-4 flex flex-col" style={{ minHeight: "8rem" }}>
                       <h3 className="text-sm sm:text-base font-semibold mb-1 text-gray-800">
                         {course.title}
@@ -185,13 +207,17 @@ const StudentDashboard = () => {
                       <p className="text-xs text-gray-500 mb-2">
                         Instructor: {course.instructor?.name || "TBA"}
                       </p>
+
                       <div className="w-full bg-blue-100 rounded-full h-2 mb-2">
                         <div
                           className="bg-sky-500 h-2 rounded-full transition-all"
                           style={{ width: `${course.progress}%` }}
                         />
                       </div>
-                      <p className="text-xs text-gray-500">{course.progress}% completed</p>
+
+                      <p className="text-xs text-gray-500">
+                        {course.progress}% completed
+                      </p>
                     </div>
                   </div>
                 ))}
