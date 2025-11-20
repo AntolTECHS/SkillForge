@@ -1,16 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import axiosInstance from "../../api/axios"; // ✅ Use centralized axios
 import { useAuth } from "../../context/AuthContext";
+import axiosInstance from "../../api/axios";
 
 const StudentDashboard = () => {
-  const { user } = useAuth();
+  const { user } = useAuth(); // user will be null if not logged in
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [stats, setStats] = useState({
-    coursesCount: 0,
-    xp: 0,
-    badges: [],
-  });
+  const [stats, setStats] = useState({ coursesCount: 0, xp: 0, badges: [] });
   const [courses, setCourses] = useState([]);
   const [enrolledIds, setEnrolledIds] = useState(new Set());
   const [showAll, setShowAll] = useState(false);
@@ -48,8 +44,13 @@ const StudentDashboard = () => {
     [user]
   );
 
-  // Fetch dashboard data
+  // Fetch dashboard data only if user is logged in
   useEffect(() => {
+    if (!user) {
+      setLoading(false); // stop loading if not logged in
+      return;
+    }
+
     const fetchDashboard = async () => {
       setLoading(true);
       setError(null);
@@ -95,13 +96,42 @@ const StudentDashboard = () => {
       }
     };
 
-    if (user) fetchDashboard();
+    fetchDashboard();
   }, [user]);
 
   const cacheBust = (url) => (url ? `${url}?v=${new Date().getTime()}` : "");
-
   const displayedCourses = showAll ? courses : courses.slice(0, 3);
 
+  // ------------------------------
+  // IF USER IS NOT LOGGED IN
+  // ------------------------------
+  if (!user) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center px-4"
+        style={rootFontStyle}
+      >
+        <div className="max-w-3xl w-full bg-gradient-to-r from-blue-400 via-sky-400 to-cyan-400 text-white rounded-3xl shadow-xl p-12 text-center">
+          <h1 className="text-3xl sm:text-5xl font-extrabold mb-6">
+            Welcome to Skill Forge!
+          </h1>
+          <p className="text-lg sm:text-xl mb-8">
+            Unlock your potential. Learn new skills, earn XP, and achieve badges!
+          </p>
+          <a
+            href="/register"
+            className="inline-block bg-white text-blue-600 font-semibold px-8 py-3 rounded-full text-lg hover:bg-gray-100 transition"
+          >
+            Get Started
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // ------------------------------
+  // LOGGED IN DASHBOARD
+  // ------------------------------
   return (
     <div className="w-full" style={rootFontStyle}>
       {/* HERO */}
