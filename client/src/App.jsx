@@ -30,7 +30,6 @@ import InstructorLayout from "./pages/instructor/InstructorLayout";
 import InstructorDashboard from "./pages/instructor/InstructorDashboard";
 import MyCourses from "./pages/instructor/MyCourses";
 import CreateCourse from "./pages/instructor/CreateCourse";
-import Quizzes from "./pages/instructor/Quizzes";
 import Students from "./pages/instructor/Students";
 import InstructorSettings from "./pages/instructor/Settings";
 import ChangePassword from "./pages/instructor/changePassword";
@@ -115,7 +114,6 @@ return ( <div className="min-h-screen bg-gray-50">
       <Route path="my-courses" element={<MyCourses />} />
       <Route path="create-course" element={<CreateCourse />} />
       <Route path="course/edit/:courseId" element={<EditCourse />} />
-      <Route path="quizzes" element={<Quizzes />} />
       <Route path="students" element={<Students />} />
       <Route path="settings" element={<InstructorSettings />} />
       <Route path="change-password" element={<ChangePassword />} />
