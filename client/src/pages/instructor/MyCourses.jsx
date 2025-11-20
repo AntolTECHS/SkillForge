@@ -12,6 +12,7 @@ const MyCourses = () => {
 
   const coursesPerPage = 5;
   const navigate = useNavigate();
+  const API_URL = import.meta.env.VITE_API_URL || "https://skillforge-75b5.onrender.com";
 
   const pageFont = {
     fontFamily:
@@ -22,21 +23,21 @@ const MyCourses = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token found");
+      if (!token) throw new Error("You must be logged in to view courses.");
 
       const res = await axios.get(
-        `http://localhost:5000/api/instructor/my-courses?page=${page}&limit=${coursesPerPage}`,
+        `${API_URL}/api/instructor/my-courses?page=${page}&limit=${coursesPerPage}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       setCourses(res.data.courses || []);
       setTotalPages(res.data.pages || 1);
     } catch (err) {
-      console.error("Failed to fetch courses", err);
+      console.error("Failed to fetch courses", err?.response?.data || err.message);
       if (err.response?.status === 403) {
         alert("Access denied. Must be an instructor.");
       } else {
-        alert("Failed to load courses.");
+        alert(`Failed to load courses: ${err?.response?.data?.message || err.message}`);
       }
     } finally {
       setLoading(false);
@@ -78,18 +79,29 @@ const MyCourses = () => {
 
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`http://localhost:5000/api/instructor/courses/${id}`, {
+      await axios.delete(`${API_URL}/api/instructor/courses/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Refresh courses immediately
-      fetchCourses(currentPage);
+      fetchCourses(currentPage); // Refresh after deletion
     } catch (err) {
-      console.error("Failed to delete course", err);
-      alert("Failed to delete course.");
+      console.error("Failed to delete course", err?.response?.data || err.message);
+      alert(`Failed to delete course: ${err?.response?.data?.message || err.message}`);
     }
   };
 
-  if (loading) return <div style={pageFont}>Loading courses...</div>;
+  if (loading)
+    return (
+      <div style={pageFont} className="p-6 text-center text-gray-500">
+        Loading courses...
+      </div>
+    );
+
+  if (courses.length === 0)
+    return (
+      <div style={pageFont} className="p-6 text-center text-gray-500">
+        No courses found. Create one to get started!
+      </div>
+    );
 
   return (
     <div style={pageFont} className="p-6">
@@ -147,19 +159,29 @@ const MyCourses = () => {
 
       {/* Pagination */}
       <div className="flex justify-center mt-4 space-x-2">
-        <button disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)}>
+        <button
+          disabled={currentPage === 1}
+          onClick={() => setCurrentPage(currentPage - 1)}
+          className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+        >
           Prev
         </button>
         {Array.from({ length: totalPages }, (_, i) => (
           <button
             key={i + 1}
             onClick={() => setCurrentPage(i + 1)}
-            className={currentPage === i + 1 ? "bg-blue-600 text-white" : ""}
+            className={`px-3 py-1 rounded ${
+              currentPage === i + 1 ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300"
+            }`}
           >
             {i + 1}
           </button>
         ))}
-        <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(currentPage + 1)}>
+        <button
+          disabled={currentPage === totalPages}
+          onClick={() => setCurrentPage(currentPage + 1)}
+          className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+        >
           Next
         </button>
       </div>
