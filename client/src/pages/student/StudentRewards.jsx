@@ -3,17 +3,22 @@ import axios from "axios";
 
 const StudentRewards = () => {
   const [xp, setXp] = useState(0);
-  const [badges, setBadges] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const res = await axios.get("/api/student/dashboard");
+        const token = localStorage.getItem("token");
+        const res = await axios.get("/api/student/dashboard", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
         const stats = res.data?.stats || {};
         setXp(stats.xp || 0);
-        setBadges(stats.badges || []);
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -24,10 +29,18 @@ const StudentRewards = () => {
     { id: 1, title: "Level 1 Achiever", xp: 1000, badgeColor: "bg-yellow-400" },
     { id: 2, title: "Level 2 Scholar", xp: 2000, badgeColor: "bg-green-400" },
     { id: 3, title: "Level 3 Champion", xp: 3000, badgeColor: "bg-purple-500" },
+    // add more rewards here
   ];
 
+  if (loading)
+    return (
+      <div className="p-6 text-center text-gray-600">
+        Loading rewards...
+      </div>
+    );
+
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-4">🏅 XP & Rewards</h1>
       <p className="text-gray-600 mb-6">
         XP is automatically awarded based on your course progress.
@@ -44,7 +57,7 @@ const StudentRewards = () => {
           return (
             <div
               key={reward.id}
-              className={`p-6 rounded-2xl text-center border shadow transition ${
+              className={`p-6 rounded-2xl text-center border shadow transition-all transform hover:scale-105 ${
                 unlocked
                   ? "bg-white border-green-400 shadow-lg"
                   : "bg-gray-100 border-gray-300 opacity-60"
@@ -63,9 +76,9 @@ const StudentRewards = () => {
 
               <p className="mt-2 text-sm font-medium">
                 {unlocked ? (
-                  <span className="text-green-600">Unlocked ✔</span>
+                  <span className="text-green-600 font-semibold">Unlocked ✔</span>
                 ) : (
-                  <span className="text-red-500">{reward.xp - xp} XP needed</span>
+                  <span className="text-red-500 font-medium">{reward.xp - xp} XP needed</span>
                 )}
               </p>
             </div>
