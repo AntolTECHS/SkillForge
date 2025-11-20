@@ -1,5 +1,7 @@
 # SkillForge Learning Platform
 
+[Live Demo](https://skill-forge-woad.vercel.app/)
+
 SkillForge is a full-stack learning management system (LMS) designed to provide a seamless experience for both **students** and **instructors**. It allows students to enroll in courses, track their progress, earn XP and badges, and manage their profiles. Instructors can create courses, add lessons, quizzes, and multimedia content, and manage their students efficiently.
 
 ---
@@ -22,11 +24,21 @@ SkillForge is a full-stack learning management system (LMS) designed to provide 
 ## Features
 
 ### For Students:
+- **Can register through the user interface.  
 - **Dashboard:** View enrolled courses, progress, XP, and badges earned.  
 - **Rewards & Gamification:** Earn XP and badges based on course completion and milestones.  
 - **Course Interaction:** Access course lessons with multimedia content (text, video, PDF), complete quizzes, and track progress.  
 - **Profile Management:** Update profile information, password, and profile photo.  
 - **Settings:** Enable/disable notifications, toggle dark mode.  
+
+#### Admin
+- Can create instructors (generates temporary password/OTP for first login).  
+- Can view, edit, and manage:
+  - Courses
+  - Students
+  - Enrollments
+  - Instructors
+- Full control over the platform and user management.  
 
 ### For Instructors:
 - **Course Creation:** Create courses with detailed lessons, quizzes, and multimedia content.  
@@ -51,6 +63,29 @@ SkillForge is a full-stack learning management system (LMS) designed to provide 
 - **Hosting:** Vercel / Render (Frontend & Backend)  
 
 ---
+
+## Project Structure
+
+
+skillforge/
+├─ client/ # Frontend (React)
+│ ├─ src/
+│ │ ├─ components/
+│ │ ├─ pages/
+│ │ ├─ context/
+│ │ ├─ api/
+│ │ └─ App.jsx
+│ └─ package.json
+├─ server/ # Backend (Node/Express)
+│ ├─ controllers/
+│ ├─ models/
+│ ├─ routes/
+│ ├─ middleware/
+│ ├─ utils/
+│ ├─ server.js
+│ └─ package.json
+├─ .gitignore
+└─ README.md
 
 ## Installation
 
@@ -78,6 +113,12 @@ PORT=5000
 MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_jwt_secret_key
 API_URL=http://localhost:5000
+# OpenRouter API
+OPENROUTER_API_KEY=
+# Cloudinary
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
 
 
 4. Frontend .env:
