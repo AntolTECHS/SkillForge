@@ -22,7 +22,7 @@ const CreateCourse = () => {
 
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API_URL = import.meta.env.VITE_API_URL || "https://skillforge-75b5.onrender.com";
 
   /** ------------------ Lesson Handlers ------------------ **/
   const handleAddLesson = () => {
@@ -118,6 +118,8 @@ const CreateCourse = () => {
 
     try {
       const token = localStorage.getItem("token");
+      if (!token) throw new Error("You must be logged in to create a course.");
+
       const formData = new FormData();
 
       // Basic info
@@ -128,12 +130,11 @@ const CreateCourse = () => {
       // Thumbnail
       if (course.thumbnail) formData.append("thumbnail", course.thumbnail);
 
-      // Lessons content
-      // Include quizzes inside lessons
+      // Lessons content (text + quizzes)
       formData.append(
         "content",
         JSON.stringify(
-          course.content.map(({ title, type, contentText, file, quiz }) => ({
+          course.content.map(({ title, type, contentText, quiz }) => ({
             title,
             type,
             contentText,
@@ -146,21 +147,22 @@ const CreateCourse = () => {
         )
       );
 
-      // Lesson files
-      course.content.forEach((lesson) => {
+      // Lesson files (video/pdf)
+      course.content.forEach((lesson, index) => {
         if ((lesson.type === "video" || lesson.type === "pdf") && lesson.file) {
-          formData.append("lessonFiles", lesson.file);
+          formData.append("lessonFiles", lesson.file, lesson.file.name);
         }
       });
 
-      await axios.post(`${API_URL}/api/courses`, formData, {
+      const response = await axios.post(`${API_URL}/api/courses`, formData, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
       });
 
+      console.log("Course created successfully:", response.data);
       navigate("/instructor/my-courses");
     } catch (err) {
-      console.error("Failed to create course", err);
-      alert("Failed to create course. Check console for details.");
+      console.error("Failed to create course", err?.response?.data || err.message);
+      alert(`Failed to create course: ${err?.response?.data?.message || err.message}`);
     } finally {
       setLoading(false);
     }
@@ -257,6 +259,7 @@ const CreateCourse = () => {
                   required
                 />
               )}
+
               {(lesson.type === "video" || lesson.type === "pdf") && (
                 <>
                   <input
@@ -266,7 +269,9 @@ const CreateCourse = () => {
                     required
                   />
                   {lesson.file && (
-                    <p className="text-sm text-gray-600">Selected file: {lesson.file.name}</p>
+                    <p className="text-sm text-gray-600">
+                      Selected file: {lesson.file.name}
+                    </p>
                   )}
                 </>
               )}
