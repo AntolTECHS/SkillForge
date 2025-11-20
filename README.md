@@ -62,11 +62,9 @@ SkillForge is a full-stack learning management system (LMS) designed to provide 
 - **HTTP Requests:** Axios  
 - **Hosting:** Vercel / Render (Frontend & Backend)  
 
----
 
 ## Project Structure
-
-
+```
 skillforge/
 ├─ client/ # Frontend (React)
 │ ├─ src/
