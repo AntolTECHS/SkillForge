@@ -1,6 +1,7 @@
 # SkillForge Learning Platform
 
 [Live Demo](https://skill-forge-woad.vercel.app/)
+
 OR JUST TYPE: https://skill-forge-woad.vercel.app
 
 SkillForge is a full-stack learning management system (LMS) designed to provide a seamless experience for both **students** and **instructors**. It allows students to enroll in courses, track their progress, earn XP and badges, and manage their profiles. Instructors can create courses, add lessons, quizzes, and multimedia content, and manage their students efficiently.
