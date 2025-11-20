@@ -102,95 +102,92 @@ const StudentDashboard = () => {
   const cacheBust = (url) => (url ? `${url}?v=${new Date().getTime()}` : "");
   const displayedCourses = showAll ? courses : courses.slice(0, 3);
 
-  // ==================== RENDER ====================
   return (
-    <div className="w-full p-6" style={rootFontStyle}>
-      {/* HERO / Welcome rectangle */}
-      <div className="mb-6">
-        <div
-          className="
-            bg-gradient-to-r from-blue-400 via-sky-400 to-cyan-400
-            text-white shadow-md overflow-hidden rounded-3xl
-            p-8 sm:p-10 lg:p-12
-            min-h-[180px] sm:min-h-[220px]
-            flex flex-col justify-center items-center text-center
-          "
-        >
-          {!user ? (
-            <>
-              <h1 className="text-4xl sm:text-5xl font-extrabold mb-4">
-                Welcome to SkillForge!
-              </h1>
-              <p className="text-white/90 max-w-xl mb-6 text-lg sm:text-xl">
-                Start your learning journey today — explore courses, earn XP, and
-                unlock badges as you master new skills.
-              </p>
-              <button
-                onClick={() => navigate("/register")}
-                className="bg-white text-blue-600 font-semibold px-6 py-3 rounded-full hover:bg-blue-50 transition"
-              >
-                Get Started
-              </button>
-            </>
-          ) : (
-            <>
-              <h1 className="text-2xl sm:text-4xl font-extrabold mb-3">
-                Welcome back, {firstName}!
-              </h1>
-              <p className="text-white/95 max-w-full text-sm sm:text-base leading-relaxed">
-                Continue your learning journey — complete lessons, earn XP, track your
-                progress, and unlock badges as you master new skills.
-              </p>
-            </>
-          )}
+    <div className="w-full min-h-screen" style={rootFontStyle}>
+      {/* ================= HERO / Welcome rectangle ================= */}
+      {!user ? (
+        // Center rectangle for guests
+        <div className="flex items-center justify-center min-h-screen px-4">
+          <div
+            className="
+              bg-gradient-to-r from-blue-400 via-sky-400 to-cyan-400
+              text-white shadow-md overflow-hidden rounded-3xl
+              p-8 sm:p-10 lg:p-12
+              text-center
+              max-w-xl w-full
+            "
+          >
+            <h1 className="text-4xl sm:text-5xl font-extrabold mb-4">
+              Welcome to SkillForge!
+            </h1>
+            <p className="text-white/90 max-w-xl mb-6 text-lg sm:text-xl">
+              Start your learning journey today — explore courses, earn XP, and
+              unlock badges as you master new skills.
+            </p>
+            <button
+              onClick={() => navigate("/register")}
+              className="bg-white text-blue-600 font-semibold px-6 py-3 rounded-full hover:bg-blue-50 transition"
+            >
+              Get Started
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        // Top rectangle for logged-in students
+        <div className="mb-6">
+          <div
+            className="
+              bg-gradient-to-r from-blue-400 via-sky-400 to-cyan-400
+              text-white shadow-md overflow-hidden rounded-3xl
+              p-8 sm:p-10 lg:p-12
+              min-h-[180px] sm:min-h-[220px]
+              flex flex-col justify-center items-center text-center
+            "
+          >
+            <h1 className="text-2xl sm:text-4xl font-extrabold mb-3">
+              Welcome back, {firstName}!
+            </h1>
+            <p className="text-white/95 max-w-full text-sm sm:text-base leading-relaxed">
+              Continue your learning journey — complete lessons, earn XP, track your
+              progress, and unlock badges as you master new skills.
+            </p>
+          </div>
+        </div>
+      )}
 
-      {/* ERROR */}
-      {error && <div className="mb-6 text-red-600 font-medium">{error}</div>}
+      {/* ================= ERROR / LOADING ================= */}
+      {error && <div className="mb-6 text-red-600 font-medium text-center">{error}</div>}
+      {loading && user && <div className="mb-6 text-gray-500 text-center">Loading dashboard...</div>}
 
-      {/* LOADING */}
-      {loading && <div className="mb-6 text-gray-500">Loading dashboard...</div>}
-
-      {/* Only show stats and courses if user is logged in */}
+      {/* ================= STATS & COURSES ================= */}
       {user && !loading && !error && (
-        <>
+        <div className="px-4">
           {/* STATS */}
           <div className="mb-12 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
             <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition">
               <h3 className="text-sm text-gray-500 mb-2">Courses Enrolled</h3>
-              <p className="text-2xl sm:text-3xl font-bold text-sky-600">
-                {stats.coursesCount}
-              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-sky-600">{stats.coursesCount}</p>
               <p className="text-xs text-gray-400 mt-1 sm:mt-2">Keep up the good work!</p>
             </div>
 
             <div className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition">
               <h3 className="text-sm text-gray-500 mb-2">XP Earned</h3>
-              <p className="text-2xl sm:text-3xl font-bold text-cyan-600">
-                {stats.xp?.toLocaleString() ?? 0}
-              </p>
-              <p className="text-xs text-gray-400 mt-1 sm:mt-2">
-                Gain more XP by finishing lessons
-              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-cyan-600">{stats.xp?.toLocaleString() ?? 0}</p>
+              <p className="text-xs text-gray-400 mt-1 sm:mt-2">Gain more XP by finishing lessons</p>
             </div>
 
             <div
               className="bg-white p-5 rounded-2xl shadow border border-blue-100 hover:shadow-lg transition col-span-2 sm:col-span-2 md:col-span-1 text-center md:text-left"
             >
               <h3 className="text-sm text-gray-500 mb-2">Badges Earned</h3>
-              <p className="text-2xl sm:text-3xl font-bold text-sky-600">
-                {stats.badges?.length ?? 0}
-              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-sky-600">{stats.badges?.length ?? 0}</p>
               <p className="text-xs text-gray-400 mt-1 sm:mt-2">Milestones unlocked</p>
             </div>
           </div>
 
           {/* CURRENT COURSES */}
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">
-              Current Courses
-            </h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">Current Courses</h2>
 
             {courses.length === 0 ? (
               <p className="text-gray-500 italic">No courses available at the moment.</p>
@@ -244,7 +241,7 @@ const StudentDashboard = () => {
               </>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
